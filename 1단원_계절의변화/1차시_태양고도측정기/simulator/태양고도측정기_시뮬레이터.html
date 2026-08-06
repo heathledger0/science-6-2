@@ -6,48 +6,170 @@
 <title>태양 고도 측정기 시뮬레이터</title>
 <style>
   :root{
-    --sky-top:#bfe3ff;
-    --sky-bottom:#eaf7ff;
-    --ground:#8fc97a;
-    --ink:#1f2937;
-    --accent:#e63946;
-    --accent2:#2a6fdb;
-    --card:#ffffff;
+    --paper:#f2efe6;
+    --panel:#fffdf8;
+    --panel-line:#e4ddc9;
+    --ink:#242019;
+    --ink-soft:#6b6355;
+    --grid-line:rgba(60,50,20,0.07);
+    --accent-sun:#c8720f;
+    --accent-sun-glow:#e69a2e;
+    --accent-sky:#2f5fa8;
+    --accent-good:#3f7d54;
+    --lcd-bg:#20261f;
+    --lcd-text:#8ff0a4;
+    --lcd-text-dim:#4f7a5c;
+    --focus:#2f5fa8;
   }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --paper:#14120d;
+      --panel:#1e1b14;
+      --panel-line:#3a3427;
+      --ink:#efe9db;
+      --ink-soft:#b3a98f;
+      --grid-line:rgba(255,240,200,0.06);
+      --accent-sun:#e69a2e;
+      --accent-sun-glow:#f4b559;
+      --accent-sky:#7fabe0;
+      --accent-good:#6bc98a;
+      --lcd-bg:#0f1a11;
+      --lcd-text:#8ff0a4;
+      --lcd-text-dim:#3f6b4c;
+      --focus:#7fabe0;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#14120d;
+    --panel:#1e1b14;
+    --panel-line:#3a3427;
+    --ink:#efe9db;
+    --ink-soft:#b3a98f;
+    --grid-line:rgba(255,240,200,0.06);
+    --accent-sun:#e69a2e;
+    --accent-sun-glow:#f4b559;
+    --accent-sky:#7fabe0;
+    --accent-good:#6bc98a;
+    --lcd-bg:#0f1a11;
+    --lcd-text:#8ff0a4;
+    --lcd-text-dim:#3f6b4c;
+    --focus:#7fabe0;
+  }
+  :root[data-theme="light"]{
+    --paper:#f2efe6;
+    --panel:#fffdf8;
+    --panel-line:#e4ddc9;
+    --ink:#242019;
+    --ink-soft:#6b6355;
+    --grid-line:rgba(60,50,20,0.07);
+    --accent-sun:#c8720f;
+    --accent-sun-glow:#e69a2e;
+    --accent-sky:#2f5fa8;
+    --accent-good:#3f7d54;
+    --lcd-bg:#20261f;
+    --lcd-text:#8ff0a4;
+    --lcd-text-dim:#4f7a5c;
+    --focus:#2f5fa8;
+  }
+
   *{box-sizing:border-box;}
+  html,body{height:100%;}
   body{
     margin:0;
-    font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;
-    background:#f2f4f7;
+    min-height:100%;
+    font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
     color:var(--ink);
+    background:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
+      var(--paper);
+    background-size:24px 24px, 24px 24px, auto;
     display:flex;
     flex-direction:column;
     align-items:center;
-    padding:16px;
+    padding:20px 14px 40px;
+    transition:background-color .2s ease, color .2s ease;
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{transition:none !important;}
+  }
+
+  .nameplate{
+    width:100%;
+    max-width:920px;
+    margin-bottom:14px;
+  }
+  .eyebrow{
+    font-family:'SFMono-Regular','Consolas',monospace;
+    font-size:.68rem;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
   }
   h1{
-    font-size:1.4rem;
-    margin:4px 0 12px;
-    text-align:center;
+    font-size:clamp(1.3rem, 1rem + 1.4vw, 1.9rem);
+    font-weight:800;
+    letter-spacing:-.01em;
+    margin:2px 0 0;
+    text-wrap:balance;
   }
+  h1 .sun-ico{
+    display:inline-block;
+    color:var(--accent-sun);
+  }
+
   .wrap{
     width:100%;
-    max-width:900px;
-    background:var(--card);
-    border-radius:16px;
-    box-shadow:0 4px 18px rgba(0,0,0,0.12);
-    padding:16px;
+    max-width:920px;
+    background:var(--panel);
+    border:1px solid var(--panel-line);
+    border-radius:18px;
+    box-shadow:0 10px 30px rgba(30,25,10,0.10);
+    padding:18px;
   }
+
+  .screen{
+    position:relative;
+    border-radius:14px;
+    padding:8px;
+    background:linear-gradient(155deg, #d9d2bd, #c7bfa4);
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,0.15);
+  }
+  @media (prefers-color-scheme: dark){
+    .screen{ background:linear-gradient(155deg, #34301f, #221f16); }
+  }
+  :root[data-theme="dark"] .screen{ background:linear-gradient(155deg, #34301f, #221f16); }
+  :root[data-theme="light"] .screen{ background:linear-gradient(155deg, #d9d2bd, #c7bfa4); }
   canvas{
     width:100%;
     height:auto;
-    background:linear-gradient(to bottom, var(--sky-top) 0%, var(--sky-bottom) 70%);
-    border-radius:12px;
+    background:linear-gradient(to bottom, #bfe3ff 0%, #eaf7ff 62%, #eaf7ff 100%);
+    border-radius:9px;
     display:block;
     touch-action:none;
   }
+
+  .legend{
+    display:flex;
+    flex-wrap:wrap;
+    gap:14px;
+    margin-top:10px;
+    padding:0 2px;
+  }
+  .legend span{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    font-size:.78rem;
+    color:var(--ink-soft);
+  }
+  .swatch{
+    width:16px;height:3px;border-radius:2px;display:inline-block;
+    box-shadow:0 0 0 1px var(--panel-line);
+  }
+
   .panel{
-    margin-top:14px;
+    margin-top:18px;
     display:grid;
     grid-template-columns:1fr;
     gap:14px;
@@ -56,80 +178,138 @@
     .panel{grid-template-columns:1fr 1fr;}
   }
   .control{
-    background:#f8f9fb;
+    background:var(--paper);
     border-radius:12px;
     padding:12px 14px;
-    border:1px solid #e5e7eb;
+    border:1px solid var(--panel-line);
   }
   .control label{
     display:flex;
     justify-content:space-between;
-    font-weight:bold;
-    font-size:0.95rem;
-    margin-bottom:6px;
+    align-items:baseline;
+    font-weight:700;
+    font-size:.92rem;
+    margin-bottom:8px;
   }
-  .control input[type=range]{
+  .control .value{
+    font-family:'SFMono-Regular','Consolas',monospace;
+    font-variant-numeric:tabular-nums;
+    color:var(--accent-sky);
+    font-weight:700;
+  }
+
+  input[type=range]{
+    -webkit-appearance:none;
+    appearance:none;
     width:100%;
+    height:6px;
+    border-radius:99px;
+    background:linear-gradient(90deg, var(--accent-sun-glow) 0%, var(--accent-sun-glow) var(--fill,50%), var(--panel-line) var(--fill,50%), var(--panel-line) 100%);
+    outline-offset:4px;
   }
-  .value{
-    color:var(--accent2);
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:20px;height:20px;
+    border-radius:50%;
+    background:var(--panel);
+    border:3px solid var(--accent-sun);
+    box-shadow:0 1px 3px rgba(0,0,0,.3);
+    cursor:pointer;
   }
+  input[type=range]::-moz-range-thumb{
+    width:14px;height:14px;
+    border-radius:50%;
+    background:var(--panel);
+    border:3px solid var(--accent-sun);
+    cursor:pointer;
+  }
+  input[type=range]:focus-visible{
+    outline:2px solid var(--focus);
+  }
+
   .toggles{
     display:flex;
     flex-wrap:wrap;
-    gap:10px;
-    margin-top:10px;
+    gap:8px;
+    margin-top:12px;
   }
   .toggles label{
     display:flex;
     align-items:center;
     gap:6px;
-    background:#f8f9fb;
-    border:1px solid #e5e7eb;
+    background:var(--paper);
+    border:1px solid var(--panel-line);
     border-radius:999px;
-    padding:8px 14px;
-    font-size:0.9rem;
+    padding:7px 13px;
+    font-size:.84rem;
     cursor:pointer;
+    user-select:none;
   }
+  .toggles input:focus-visible{
+    outline:2px solid var(--focus);
+  }
+
   .readout{
-    margin-top:14px;
+    margin-top:16px;
     display:flex;
     flex-wrap:wrap;
     gap:10px;
   }
   .badge{
     flex:1;
-    min-width:150px;
-    background:#eef4ff;
+    min-width:160px;
+    background:var(--lcd-bg);
     border-radius:12px;
-    padding:10px 14px;
-    text-align:center;
+    padding:12px 14px;
+    text-align:left;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,0.04);
   }
   .badge .num{
-    font-size:1.5rem;
-    font-weight:800;
-    color:var(--accent);
+    font-family:'SFMono-Regular','Consolas',monospace;
+    font-variant-numeric:tabular-nums;
+    font-size:1.55rem;
+    font-weight:700;
+    color:var(--lcd-text);
+    text-shadow:0 0 10px rgba(143,240,164,0.35);
   }
   .badge .lab{
-    font-size:0.8rem;
-    color:#555;
+    margin-top:2px;
+    font-size:.72rem;
+    letter-spacing:.03em;
+    color:var(--lcd-text-dim);
   }
+
   .note{
-    margin-top:14px;
-    font-size:0.85rem;
-    color:#444;
-    background:#fff7e6;
-    border:1px solid #ffe1a8;
+    margin-top:16px;
+    font-size:.85rem;
+    color:var(--ink);
+    background:var(--paper);
+    border:1px dashed var(--panel-line);
     border-radius:10px;
-    padding:10px 12px;
-    line-height:1.5;
+    padding:12px 14px;
+    line-height:1.55;
   }
+  .note b{color:var(--accent-sun);}
 </style>
 </head>
 <body>
-  <h1>☀️ 태양 고도 측정기 시뮬레이터</h1>
+  <div class="nameplate">
+    <div class="eyebrow">SCIENCE LAB INSTRUMENT · 6학년 2학기 1단원 계절의 변화</div>
+    <h1><span class="sun-ico">☀</span> 태양 고도 측정기 시뮬레이터</h1>
+  </div>
+
   <div class="wrap">
-    <canvas id="stage" width="900" height="500"></canvas>
+    <div class="screen">
+      <canvas id="stage" width="900" height="500"></canvas>
+    </div>
+
+    <div class="legend">
+      <span><i class="swatch" style="background:#6d4c2f"></i>막대기</span>
+      <span><i class="swatch" style="background:#333333"></i>그림자</span>
+      <span><i class="swatch" style="background:#2a6fdb"></i>실(측정선)</span>
+      <span><i class="swatch" style="background:#ff9500;opacity:.7"></i>태양 광선</span>
+      <span><i class="swatch" style="background:#e63946"></i>측정 각도</span>
+    </div>
 
     <div class="panel">
       <div class="control">
@@ -196,15 +376,23 @@
   function deg2rad(d){ return d * Math.PI / 180; }
   function rad2deg(r){ return r * 180 / Math.PI; }
 
+  function updateSliderFill(slider){
+    const min = parseFloat(slider.min), max = parseFloat(slider.max), v = parseFloat(slider.value);
+    const pct = ((v - min) / (max - min)) * 100;
+    slider.style.setProperty('--fill', pct + '%');
+  }
+
   function drawScene(){
     const elevDeg = parseFloat(elevSlider.value);
     const stickCm = parseFloat(stickSlider.value);
     elevVal.textContent = elevDeg + '°';
     stickVal.textContent = stickCm + 'cm';
+    updateSliderFill(elevSlider);
+    updateSliderFill(stickSlider);
 
     ctx.clearRect(0,0,W,H);
 
-    // 하늘 배경은 CSS 그라디언트로 처리, 여기서는 태양/땅/막대기만 그림
+    // 하늘은 canvas 자체 CSS 배경(고정 주간 하늘)을 사용하고, 여기서는 태양/땅/막대기만 그림
     // 땅
     ctx.fillStyle = '#8fc97a';
     ctx.fillRect(0, groundY, W, H - groundY);
