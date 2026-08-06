@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>태양 고도 측정기 시뮬레이터</title>
+<style>
+  :root{
+    --sky-top:#bfe3ff;
+    --sky-bottom:#eaf7ff;
+    --ground:#8fc97a;
+    --ink:#1f2937;
+    --accent:#e63946;
+    --accent2:#2a6fdb;
+    --card:#ffffff;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;
+    background:#f2f4f7;
+    color:var(--ink);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:16px;
+  }
+  h1{
+    font-size:1.4rem;
+    margin:4px 0 12px;
+    text-align:center;
+  }
+  .wrap{
+    width:100%;
+    max-width:900px;
+    background:var(--card);
+    border-radius:16px;
+    box-shadow:0 4px 18px rgba(0,0,0,0.12);
+    padding:16px;
+  }
+  canvas{
+    width:100%;
+    height:auto;
+    background:linear-gradient(to bottom, var(--sky-top) 0%, var(--sky-bottom) 70%);
+    border-radius:12px;
+    display:block;
+    touch-action:none;
+  }
+  .panel{
+    margin-top:14px;
+    display:grid;
+    grid-template-columns:1fr;
+    gap:14px;
+  }
+  @media(min-width:640px){
+    .panel{grid-template-columns:1fr 1fr;}
+  }
+  .control{
+    background:#f8f9fb;
+    border-radius:12px;
+    padding:12px 14px;
+    border:1px solid #e5e7eb;
+  }
+  .control label{
+    display:flex;
+    justify-content:space-between;
+    font-weight:bold;
+    font-size:0.95rem;
+    margin-bottom:6px;
+  }
+  .control input[type=range]{
+    width:100%;
+  }
+  .value{
+    color:var(--accent2);
+  }
+  .toggles{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-top:10px;
+  }
+  .toggles label{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    background:#f8f9fb;
+    border:1px solid #e5e7eb;
+    border-radius:999px;
+    padding:8px 14px;
+    font-size:0.9rem;
+    cursor:pointer;
+  }
+  .readout{
+    margin-top:14px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  .badge{
+    flex:1;
+    min-width:150px;
+    background:#eef4ff;
+    border-radius:12px;
+    padding:10px 14px;
+    text-align:center;
+  }
+  .badge .num{
+    font-size:1.5rem;
+    font-weight:800;
+    color:var(--accent);
+  }
+  .badge .lab{
+    font-size:0.8rem;
+    color:#555;
+  }
+  .note{
+    margin-top:14px;
+    font-size:0.85rem;
+    color:#444;
+    background:#fff7e6;
+    border:1px solid #ffe1a8;
+    border-radius:10px;
+    padding:10px 12px;
+    line-height:1.5;
+  }
+</style>
+</head>
+<body>
+  <h1>☀️ 태양 고도 측정기 시뮬레이터</h1>
+  <div class="wrap">
+    <canvas id="stage" width="900" height="500"></canvas>
+
+    <div class="panel">
+      <div class="control">
+        <label>태양 고도(태양의 높이) <span class="value" id="elevVal">45°</span></label>
+        <!-- 주요 변수 1: 태양 고도(degree). 0(일출/일몰)~85(정오에 가까움) 사이로 조절.
+             하루 동안 태양이 뜨고 지는 모습이나, 태양 고도가 낮/높을 때 그림자 변화를 보여줄 때 사용하세요. -->
+        <input type="range" id="elevSlider" min="5" max="85" step="1" value="45">
+      </div>
+      <div class="control">
+        <label>막대기(수수깡) 길이 <span class="value" id="stickVal">10cm</span></label>
+        <!-- 주요 변수 2: 막대기 길이(cm). 5~30cm 사이로 조절.
+             막대기 길이를 바꿔도 "측정된 태양 고도"는 변하지 않는다는 것을 보여주는 것이 이 차시의 핵심 오개념 교정 포인트입니다. -->
+        <input type="range" id="stickSlider" min="5" max="30" step="1" value="10">
+      </div>
+    </div>
+
+    <div class="toggles">
+      <label><input type="checkbox" id="compareMode"> 막대기 3개 동시 비교 모드 (오개념 교정용)</label>
+      <label><input type="checkbox" id="showRays" checked> 태양 광선 표시</label>
+      <label><input type="checkbox" id="showArc" checked> 측정 각도 표시</label>
+    </div>
+
+    <div class="readout">
+      <div class="badge">
+        <div class="num" id="shadowOut">-</div>
+        <div class="lab">그림자 길이 (cm)</div>
+      </div>
+      <div class="badge">
+        <div class="num" id="measuredOut">-</div>
+        <div class="lab">측정된 태양 고도(각도기로 잰 값)</div>
+      </div>
+      <div class="badge">
+        <div class="num" id="diffOut">-</div>
+        <div class="lab">실제 태양 고도와의 오차</div>
+      </div>
+    </div>
+
+    <div class="note">
+      💡 <b>활용 팁</b>: "막대기 3개 동시 비교 모드"를 켜고 막대기 길이를 바꿔가며 관찰해 보세요. 막대기 길이가 달라도
+      그림자가 함께 늘어나거나 줄어들어서, <b>세 막대기 모두 같은 태양 고도</b>를 가리키는 것을 눈으로 확인할 수 있습니다.
+      (그림자 길이 = 막대기 길이 ÷ tan(태양 고도))
+    </div>
+  </div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('stage');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const groundY = H * 0.72;
+  const pxPerCm = 6; // 화면상 1cm를 몇 픽셀로 그릴지 (표현용 스케일)
+
+  const elevSlider = document.getElementById('elevSlider');
+  const stickSlider = document.getElementById('stickSlider');
+  const elevVal = document.getElementById('elevVal');
+  const stickVal = document.getElementById('stickVal');
+  const compareMode = document.getElementById('compareMode');
+  const showRays = document.getElementById('showRays');
+  const showArc = document.getElementById('showArc');
+  const shadowOut = document.getElementById('shadowOut');
+  const measuredOut = document.getElementById('measuredOut');
+  const diffOut = document.getElementById('diffOut');
+
+  function deg2rad(d){ return d * Math.PI / 180; }
+  function rad2deg(r){ return r * 180 / Math.PI; }
+
+  function drawScene(){
+    const elevDeg = parseFloat(elevSlider.value);
+    const stickCm = parseFloat(stickSlider.value);
+    elevVal.textContent = elevDeg + '°';
+    stickVal.textContent = stickCm + 'cm';
+
+    ctx.clearRect(0,0,W,H);
+
+    // 하늘 배경은 CSS 그라디언트로 처리, 여기서는 태양/땅/막대기만 그림
+    // 땅
+    ctx.fillStyle = '#8fc97a';
+    ctx.fillRect(0, groundY, W, H - groundY);
+    ctx.strokeStyle = '#5a9c46';
+    ctx.beginPath();
+    ctx.moveTo(0, groundY);
+    ctx.lineTo(W, groundY);
+    ctx.stroke();
+
+    // 태양 위치 계산 (막대기 기준점에서 왼쪽 위 방향으로 태양이 있다고 가정)
+    const baseX = W * 0.62;
+    const sunDist = 380;
+    const elevRad = deg2rad(elevDeg);
+    const sunX = baseX - Math.cos(elevRad) * sunDist;
+    const sunY = groundY - Math.sin(elevRad) * sunDist;
+
+    // 태양 그리기
+    ctx.fillStyle = '#ffb703';
+    ctx.beginPath();
+    ctx.arc(sunX, sunY, 26, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle = '#ff9500';
+    ctx.lineWidth = 3;
+    for(let i=0;i<8;i++){
+      const a = i/8 * Math.PI*2;
+      ctx.beginPath();
+      ctx.moveTo(sunX + Math.cos(a)*32, sunY + Math.sin(a)*32);
+      ctx.lineTo(sunX + Math.cos(a)*42, sunY + Math.sin(a)*42);
+      ctx.stroke();
+    }
+
+    const sticks = compareMode.checked ? [stickCm*0.6, stickCm, stickCm*1.6] : [stickCm];
+    const gap = 130;
+    const startX = baseX - (sticks.length-1) * gap / 2;
+
+    let lastShadow = 0, lastMeasured = 0;
+
+    sticks.forEach((h, idx) => {
+      const x = startX + idx * gap;
+      const stickPx = h * pxPerCm;
+      const topX = x, topY = groundY - stickPx;
+      const shadowLenCm = h / Math.tan(elevRad);
+      const shadowPx = shadowLenCm * pxPerCm;
+      // 태양이 오른쪽 하늘에 있다고 가정했으므로 그림자는 왼쪽 방향(태양 반대편)으로 생김
+      const shadowX = x - shadowPx;
+
+      // 태양 광선(막대 끝~태양)
+      if(showRays.checked){
+        ctx.strokeStyle = 'rgba(255,149,0,0.55)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6,5]);
+        ctx.beginPath();
+        ctx.moveTo(topX, topY);
+        ctx.lineTo(sunX, sunY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      // 막대기
+      ctx.strokeStyle = '#6d4c2f';
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.moveTo(x, groundY);
+      ctx.lineTo(topX, topY);
+      ctx.stroke();
+
+      // 그림자
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(x, groundY);
+      ctx.lineTo(shadowX, groundY);
+      ctx.stroke();
+
+      // 실(막대 끝 ~ 그림자 끝) : 태양 고도 측정기의 '실' 역할
+      ctx.strokeStyle = '#2a6fdb';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(topX, topY);
+      ctx.lineTo(shadowX, groundY);
+      ctx.stroke();
+
+      // 각도 표시(그림자와 실이 이루는 각 = 태양 고도)
+      const measuredDeg = rad2deg(Math.atan2(stickPx, shadowPx));
+      if(showArc.checked){
+        ctx.strokeStyle = '#e63946';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(shadowX, groundY, 34, -measuredDeg*Math.PI/180, 0, false);
+        ctx.stroke();
+        ctx.fillStyle = '#e63946';
+        ctx.font = 'bold 13px sans-serif';
+        ctx.fillText(measuredDeg.toFixed(1)+'°', shadowX+38, groundY-14);
+      }
+
+      // 막대기 길이 라벨 (막대기 맨 위쪽에 표시해 각도 표시와 겹치지 않도록 함)
+      ctx.fillStyle = '#333';
+      ctx.font = 'bold 12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(h.toFixed(0)+'cm', topX, topY-8);
+      ctx.textAlign = 'left';
+
+      lastShadow = shadowLenCm;
+      lastMeasured = measuredDeg;
+    });
+
+    shadowOut.textContent = lastShadow.toFixed(1);
+    measuredOut.textContent = lastMeasured.toFixed(1) + '°';
+    diffOut.textContent = Math.abs(lastMeasured - elevDeg).toFixed(1) + '°';
+  }
+
+  [elevSlider, stickSlider, compareMode, showRays, showArc].forEach(el=>{
+    el.addEventListener('input', drawScene);
+    el.addEventListener('change', drawScene);
+  });
+
+  drawScene();
+})();
+</script>
+</body>
+</html>
