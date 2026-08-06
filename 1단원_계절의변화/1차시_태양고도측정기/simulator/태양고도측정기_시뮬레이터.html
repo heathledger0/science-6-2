@@ -436,8 +436,8 @@
       const topX = x, topY = groundY - stickPx;
       const shadowLenCm = h / Math.tan(elevRad);
       const shadowPx = shadowLenCm * pxPerCm;
-      // 태양이 오른쪽 하늘에 있다고 가정했으므로 그림자는 왼쪽 방향(태양 반대편)으로 생김
-      const shadowX = x - shadowPx;
+      // 태양이 왼쪽 하늘에 있으므로 그림자는 태양 반대편인 오른쪽 방향으로 생김
+      const shadowX = x + shadowPx;
 
       // 태양 광선(막대 끝~태양)
       if(showRays.checked){
@@ -476,16 +476,21 @@
       ctx.stroke();
 
       // 각도 표시(그림자와 실이 이루는 각 = 태양 고도)
+      // 그림자 끝(shadowX)을 기준으로, 땅을 따라 막대기 쪽(-x, 즉 각도 π)을 시작 각도로 삼아
+      // 실이 뻗어가는 방향(measuredRad - π)까지 호를 그리면 측정 각도가 정확히 표시됨
       const measuredDeg = rad2deg(Math.atan2(stickPx, shadowPx));
+      const measuredRad = deg2rad(measuredDeg);
       if(showArc.checked){
         ctx.strokeStyle = '#e63946';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.arc(shadowX, groundY, 34, -measuredDeg*Math.PI/180, 0, false);
+        ctx.arc(shadowX, groundY, 34, -Math.PI, measuredRad - Math.PI, false);
         ctx.stroke();
         ctx.fillStyle = '#e63946';
         ctx.font = 'bold 13px sans-serif';
-        ctx.fillText(measuredDeg.toFixed(1)+'°', shadowX+38, groundY-14);
+        ctx.textAlign = 'right';
+        ctx.fillText(measuredDeg.toFixed(1)+'°', shadowX-38, groundY-14);
+        ctx.textAlign = 'left';
       }
 
       // 막대기 길이 라벨 (막대기 맨 위쪽에 표시해 각도 표시와 겹치지 않도록 함)
