@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>계절별 태양 궤적 시뮬레이터</title>
+<title>천구 태양 궤적 시뮬레이터</title>
 <style>
   :root{
     --paper:#f2efe6;
@@ -64,7 +64,7 @@
   }
   @media (prefers-reduced-motion: reduce){ *{transition:none !important;} }
 
-  .nameplate{ width:100%; max-width:920px; margin-bottom:14px; }
+  .nameplate{ width:100%; max-width:960px; margin-bottom:14px; }
   .eyebrow{
     font-family:'SFMono-Regular','Consolas',monospace; font-size:.68rem; letter-spacing:.14em;
     text-transform:uppercase; color:var(--ink-soft);
@@ -73,22 +73,32 @@
   h1 .ico{ display:inline-block; }
 
   .wrap{
-    width:100%; max-width:920px; background:var(--panel); border:1px solid var(--panel-line);
+    width:100%; max-width:960px; background:var(--panel); border:1px solid var(--panel-line);
     border-radius:18px; box-shadow:0 10px 30px rgba(30,25,10,0.10); padding:18px;
   }
   .screen{
-    position:relative; border-radius:14px; padding:8px;
+    position:relative; border-radius:14px; padding:8px; overflow:hidden;
     background:linear-gradient(155deg, #d9d2bd, #c7bfa4);
     box-shadow:inset 0 0 0 1px rgba(0,0,0,0.15);
   }
   @media (prefers-color-scheme: dark){ .screen{ background:linear-gradient(155deg, #34301f, #221f16); } }
   :root[data-theme="dark"] .screen{ background:linear-gradient(155deg, #34301f, #221f16); }
   :root[data-theme="light"] .screen{ background:linear-gradient(155deg, #d9d2bd, #c7bfa4); }
-  canvas{
-    width:100%; height:auto;
-    background:linear-gradient(to bottom, #bfe3ff 0%, #eaf7ff 70%, #eaf7ff 100%);
-    border-radius:9px; display:block;
+  canvas{ width:100%; height:auto; border-radius:9px; display:block; }
+
+  .hud{
+    position:absolute; top:18px; left:18px;
+    background:rgba(20,22,18,0.55);
+    color:#f3f3ee;
+    border-radius:12px;
+    padding:12px 16px;
+    font-size:.86rem;
+    line-height:1.5;
+    backdrop-filter:blur(2px);
+    pointer-events:none;
   }
+  .hud .hud-title{ font-weight:800; font-size:.95rem; margin-bottom:6px; }
+  .hud .hud-num{ font-family:'SFMono-Regular','Consolas',monospace; font-weight:700; }
 
   .legend{ display:flex; flex-wrap:wrap; gap:14px; margin-top:10px; padding:0 2px; }
   .legend span{ display:inline-flex; align-items:center; gap:6px; font-size:.78rem; color:var(--ink-soft); }
@@ -134,43 +144,54 @@
 <body>
   <div class="nameplate">
     <div class="eyebrow">SCIENCE LAB INSTRUMENT · 6학년 2학기 1단원 계절의 변화 (3~4차시)</div>
-    <h1><span class="ico">🌤️</span> 계절별 태양 궤적 시뮬레이터</h1>
+    <h1><span class="ico">🌐</span> 천구 태양 궤적 시뮬레이터</h1>
   </div>
 
   <div class="wrap">
     <div class="screen">
-      <canvas id="stage" width="900" height="500"></canvas>
+      <canvas id="stage" width="900" height="560"></canvas>
+      <div class="hud">
+        <div class="hud-title">🧭 관측 정보</div>
+        현재 계절: <span class="hud-num" id="hudSeason">-</span><br>
+        현재 시각: <span class="hud-num" id="hudTime">-</span><br>
+        태양 고도: <span class="hud-num" id="hudAlt">-</span>
+      </div>
     </div>
 
     <div class="legend" id="legend">
       <span><i class="swatch" style="background:#e0790f"></i>선택한 달의 태양 궤적</span>
-      <span><i class="dot" style="background:#e0790f"></i>남중(태양이 정남쪽에 위치)</span>
+      <span><i class="swatch" style="background:#9aa3b5;opacity:.8"></i>천구의 적도(춘분·추분 궤적)</span>
+      <span><i class="dot" style="background:#ffffff"></i>북극성(항상 고정)</span>
     </div>
 
     <div class="panel">
       <div class="control">
         <label>월(매월 21일 기준) <span class="value" id="monthVal">6월 21일 · 여름</span></label>
-        <!-- 주요 변수: 월(1~12). 매월 21일 기준으로 서울(위도 37.5°N)의 실제 남중 고도·낮의 길이를
-             계산합니다. 하루 수업 중 학생들에게 봄→여름→가을→겨울 순서로 슬라이더를 천천히
-             움직이며 궤적이 점점 높아졌다 낮아지는 모습을 보여주세요. -->
+        <!-- 주요 변수 1: 월(1~12). 매월 21일 기준으로 서울(위도 37.5°N)의 실제 태양 적위를 계산해
+             그날의 태양 궤적(하늘길)을 그립니다. -->
         <input type="range" id="monthSlider" min="1" max="12" step="1" value="6">
       </div>
       <div class="control">
-        <label>사계절 동시 비교 모드</label>
-        <div class="toggles" style="margin-top:0;">
-          <label><input type="checkbox" id="compareMode"> 봄·여름·가을·겨울 궤적 한눈에 비교</label>
-        </div>
+        <label>시각(하루 중 태양 위치) <span class="value" id="hourVal">08:45</span></label>
+        <!-- 주요 변수 2: 시각(0~24시, 태양시 기준 단순 모델 · 균시차/표준시 보정 없음).
+             이 슬라이더를 움직이면 태양이 실제로 궤적을 따라 이동하고, 나무 그림자도 함께 바뀝니다. -->
+        <input type="range" id="hourSlider" min="0" max="24" step="0.25" value="8.75">
       </div>
+    </div>
+
+    <div class="toggles">
+      <label><input type="checkbox" id="compareMode"> 봄·여름·가을·겨울 궤적 한눈에 비교</label>
+      <label><input type="checkbox" id="showEquator" checked> 천구의 적도(기준선) 표시</label>
     </div>
 
     <div class="readout">
       <div class="badge">
         <div class="num" id="altOut">-</div>
-        <div class="lab">태양의 남중 고도</div>
+        <div class="lab">이 달의 태양 남중 고도</div>
       </div>
       <div class="badge">
         <div class="num" id="dayLenOut">-</div>
-        <div class="lab">낮의 길이</div>
+        <div class="lab">이 달의 낮의 길이</div>
       </div>
       <div class="badge">
         <div class="num" id="riseSetOut">-</div>
@@ -179,10 +200,12 @@
     </div>
 
     <div class="note">
-      💡 <b>활용 팁</b>: 슬라이더를 겨울(12월)에서 여름(6월)까지 천천히 움직이면서, 태양이 지나가는
-      길이 <b>점점 높아지고(남중 고도 증가) 동시에 옆으로도 점점 넓어지는(낮의 길이 증가)</b> 모습을
-      함께 보여주세요. "사계절 동시 비교" 모드를 켜면 네 계절의 궤적을 한 화면에서 바로 비교할 수
-      있습니다. (서울 기준 실제 천문 계산값이며, 지역마다 값이 조금씩 다를 수 있습니다.)
+      💡 <b>활용 팁</b>: 먼저 <b>월 슬라이더</b>로 겨울→여름을 오가며 태양이 지나가는 길(하늘길) 자체가
+      높아졌다 낮아지는 것을 보여준 뒤, <b>시각 슬라이더</b>로 그 길을 따라 태양이 실제로 움직이며
+      나무 그림자가 짧아졌다 길어지는 모습을 보여주세요. 점선으로 표시된 <b>천구의 적도</b>는 태양이
+      봄·가을(춘분·추분)에 지나가는 길과 정확히 같아서, 계절별 궤적이 이 기준선보다 얼마나 높은지·
+      낮은지로 남중 고도 차이를 비교할 수 있습니다. (서울 위도 기준 실제 계산값이며, 시각은 균시차를
+      무시한 단순 태양시 모델입니다.)
     </div>
   </div>
 
@@ -191,25 +214,15 @@
   const canvas = document.getElementById('stage');
   const ctx = canvas.getContext('2d');
   const W = canvas.width, H = canvas.height;
-  const groundY = H * 0.84;
-  const topPad = 50;
-  const plotH = groundY - topPad;
-  const maxAltForScale = 90; // 세로축(고도) 스케일의 최댓값
-  const centerX = W * 0.5;
-  const azHalfRangeDeg = 135; // 가로축(남쪽 기준 방위각) 표시 범위: -135°~+135°
-  const plotHalfW = W * 0.43;
 
   const LAT = 37.5; // 시뮬레이션 기준 위도(서울)
 
   function deg2rad(d){ return d * Math.PI / 180; }
   function rad2deg(r){ return r * 180 / Math.PI; }
+  function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+  function lerp(a,b,t){ return a + (b-a)*t; }
 
-  // 시드 기반 의사난수(잔디 등 고정 질감을 위해 사용, 매 프레임 흔들리지 않음)
-  function pseudoRandom(seed){
-    const x = Math.sin(seed * 12.9898) * 43758.5453;
-    return x - Math.floor(x);
-  }
-
+  // ---------- 천문 계산 ----------
   const CUM_DAYS = [0,31,59,90,120,151,181,212,243,273,304,334];
   function dayOfYear21st(month){ return CUM_DAYS[month-1] + 21; }
   function declination(doy){ return 23.44 * Math.sin(2*Math.PI/365 * (doy - 81)); }
@@ -217,19 +230,19 @@
   function halfDayHourAngleDeg(decl){
     const latR = deg2rad(LAT), decR = deg2rad(decl);
     let cosH0 = -Math.tan(latR) * Math.tan(decR);
-    cosH0 = Math.max(-1, Math.min(1, cosH0));
+    cosH0 = clamp(cosH0, -1, 1);
     return rad2deg(Math.acos(cosH0));
   }
   function dayLengthHours(H0deg){ return H0deg * 2 * 24 / 360; }
-  // 시간각(Hdeg, 남중=0)에서의 태양 고도·방위각(남쪽 기준, 동쪽은 음수/서쪽은 양수)을 계산
+  // 시간각(Hdeg, 남중=0, 태양시 기준)에서의 태양 고도·방위각(남쪽=0, 동쪽=음수, 서쪽=양수)
   function sunPosition(decl, Hdeg){
     const latR = deg2rad(LAT), decR = deg2rad(decl), H = deg2rad(Hdeg);
     let sinAlt = Math.sin(latR)*Math.sin(decR) + Math.cos(latR)*Math.cos(decR)*Math.cos(H);
-    sinAlt = Math.max(-1, Math.min(1, sinAlt));
+    sinAlt = clamp(sinAlt, -1, 1);
     const alt = Math.asin(sinAlt);
     let cosA = (Math.sin(decR) - Math.sin(latR)*sinAlt) / (Math.cos(latR)*Math.cos(alt));
-    cosA = Math.max(-1, Math.min(1, cosA));
-    let A = Math.acos(cosA); // 0~180, 북쪽 기준
+    cosA = clamp(cosA, -1, 1);
+    let A = Math.acos(cosA); // 0~180, 북쪽 기준 시계방향
     if(Hdeg > 0) A = 2*Math.PI - A;
     return { altDeg: rad2deg(alt), azFromSouthDeg: rad2deg(A) - 180 };
   }
@@ -240,22 +253,18 @@
     return '겨울';
   }
   function fmtTime(hoursDecimal){
-    let h = Math.floor(hoursDecimal);
-    let m = Math.round((hoursDecimal - h) * 60);
-    if(m === 60){ m = 0; h += 1; }
+    let hh = ((hoursDecimal % 24) + 24) % 24;
+    let h = Math.floor(hh);
+    let m = Math.round((hh - h) * 60);
+    if(m === 60){ m = 0; h = (h+1)%24; }
     return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
   }
-  // 낮의 길이는 "시각"이 아니라 "기간"이므로 시:분 대신 'N시간 M분'으로 표기해 혼동을 막음
   function fmtDuration(hoursDecimal){
     let h = Math.floor(hoursDecimal);
     let m = Math.round((hoursDecimal - h) * 60);
     if(m === 60){ m = 0; h += 1; }
     return h + '시간 ' + m + '분';
   }
-
-  function xOf(az){ return centerX + (az / azHalfRangeDeg) * plotHalfW; }
-  function yOf(alt){ return groundY - (alt / maxAltForScale) * plotH; }
-
   function computeMonthData(month){
     const decl = declination(dayOfYear21st(month));
     const H0 = halfDayHourAngleDeg(decl);
@@ -264,149 +273,301 @@
     return { decl, H0, alt, dayLen };
   }
 
-  function pathPoints(decl, H0){
+  // ---------- 3D 좌표계 & 투영 ----------
+  // 로컬 지평좌표계: X=동(+), Y=천정(+), Z=남(+)
+  function sphericalToXYZ(altDeg, azFromSouthDeg, radius){
+    const alt = deg2rad(altDeg), az = deg2rad(azFromSouthDeg);
+    return {
+      x: -Math.sin(az) * Math.cos(alt) * radius,
+      y:  Math.sin(alt) * radius,
+      z:  Math.cos(az) * Math.cos(alt) * radius
+    };
+  }
+  const worldScale = 165;
+  const centerX = W * 0.5;
+  const centerY = H * 0.58;
+  const tiltTheta = deg2rad(27); // 카메라가 내려다보는 각도
+
+  function project(p){
+    // 카메라가 남쪽을 바라보며 아래로 기울어져 있다고 가정: 고도(Y)가 높을수록,
+    // 남쪽(Z+)일수록 화면에서 더 위로 올라가야 함 (둘 다 음수 기여 = 위로).
+    const yp = -(p.y*Math.cos(tiltTheta) + p.z*Math.sin(tiltTheta));
+    const zp = p.z*Math.cos(tiltTheta) - p.y*Math.sin(tiltTheta);
+    // 카메라가 남쪽을 바라본다고 가정하면(남=화면 안쪽), 관찰자 기준 동쪽은 화면 왼쪽에 옵니다.
+    // 그래서 월드 X(동+)를 화면에 그대로 쓰면 좌우가 뒤바뀌므로 부호를 반전합니다.
+    return { sx: centerX - p.x*worldScale, sy: centerY + yp*worldScale, depth: zp };
+  }
+  function projectAltAz(altDeg, azDeg, radius){ return project(sphericalToXYZ(altDeg, azDeg, radius)); }
+
+  const R_GROUND = 1.0;
+  const R_ARC = 1.18; // 태양 궤적을 그리는 반구 반지름
+
+  // 땅(원판)은 Y=0 평면의 원이므로 항상 정확한 타원으로 그릴 수 있음
+  function groundEllipse(radius){
+    return {
+      rh: radius * worldScale,
+      rv: radius * worldScale * Math.sin(tiltTheta)
+    };
+  }
+
+  // ---------- 하늘 색(태양 고도에 따라 낮/노을/밤 자연스럽게 전환) ----------
+  function hexToRgb(hex){
+    const n = parseInt(hex.slice(1),16);
+    return [(n>>16)&255,(n>>8)&255,n&255];
+  }
+  function rgbStr(c){ return `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`; }
+  function lerpRgb(c1,c2,t){ return [lerp(c1[0],c2[0],t),lerp(c1[1],c2[1],t),lerp(c1[2],c2[2],t)]; }
+  const NIGHT = { top:hexToRgb('#0c1128'), bottom:hexToRgb('#1c2444') };
+  const DUSK  = { top:hexToRgb('#5b6ea8'), bottom:hexToRgb('#f2a774') };
+  const DAY   = { top:hexToRgb('#bfe3ff'), bottom:hexToRgb('#eaf7ff') };
+  function skyColors(alt){
+    let top, bottom;
+    if(alt <= -18){ top = NIGHT.top; bottom = NIGHT.bottom; }
+    else if(alt <= 0){ const t = clamp((alt+18)/18,0,1); top = lerpRgb(NIGHT.top,DUSK.top,t); bottom = lerpRgb(NIGHT.bottom,DUSK.bottom,t); }
+    else if(alt <= 20){ const t = clamp(alt/20,0,1); top = lerpRgb(DUSK.top,DAY.top,t); bottom = lerpRgb(DUSK.bottom,DAY.bottom,t); }
+    else { top = DAY.top; bottom = DAY.bottom; }
+    return { top: rgbStr(top), bottom: rgbStr(bottom) };
+  }
+
+  // ---------- 시드 기반 의사난수(별, 잔디처럼 고정된 질감에 사용) ----------
+  function pseudoRandom(seed){
+    const x = Math.sin(seed * 12.9898) * 43758.5453;
+    return x - Math.floor(x);
+  }
+
+  function pathAltAz(decl, H0, steps){
     const pts = [];
-    const steps = 60;
     for(let i=0;i<=steps;i++){
       const Hdeg = -H0 + (2*H0)*(i/steps);
-      const p = sunPosition(decl, Hdeg);
-      pts.push(p);
+      pts.push(sunPosition(decl, Hdeg));
     }
     return pts;
   }
 
-  function drawArc(decl, H0, color, showPeakLabel, lineWidth){
-    const pts = pathPoints(decl, H0);
+  function strokeSkyPath(pts, radius, color, lineWidth, dash){
     ctx.strokeStyle = color;
     ctx.lineWidth = lineWidth;
-    ctx.lineJoin = 'round';
+    ctx.setLineDash(dash || []);
     ctx.beginPath();
-    pts.forEach((p, i)=>{
-      const x = xOf(p.azFromSouthDeg), y = yOf(Math.max(0,p.altDeg));
-      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    pts.forEach((p,i)=>{
+      const q = projectAltAz(Math.max(0,p.altDeg), p.azFromSouthDeg, radius);
+      if(i===0) ctx.moveTo(q.sx,q.sy); else ctx.lineTo(q.sx,q.sy);
     });
     ctx.stroke();
+    ctx.setLineDash([]);
+  }
 
-    // 남중(정점) 표시
-    const peak = sunPosition(decl, 0);
-    const px = xOf(peak.azFromSouthDeg), py = yOf(peak.altDeg);
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(px, py, 6, 0, Math.PI*2);
-    ctx.fill();
-
-    if(showPeakLabel){
-      ctx.strokeStyle = 'rgba(80,70,50,0.4)';
-      ctx.lineWidth = 1.4;
-      ctx.setLineDash([4,4]);
+  function drawTree(baseX, baseZ, height, canopyColor, sunAlt, sunAz){
+    // 그림자(태양이 지평선 위에 있을 때만)
+    if(sunAlt > 0.5){
+      const shadowLen = Math.min(height / Math.tan(deg2rad(Math.max(sunAlt,4))), height*7);
+      const azR = deg2rad(sunAz);
+      const dirX = Math.sin(azR), dirZ = -Math.cos(azR); // 태양 반대 방향(그림자 방향)
+      const tipX = baseX + dirX*shadowLen, tipZ = baseZ + dirZ*shadowLen;
+      const pBase = project({x:baseX,y:0,z:baseZ});
+      const pTip = project({x:tipX,y:0,z:tipZ});
+      const shadowAlpha = clamp(0.38 - sunAlt/220, 0.12, 0.38);
+      ctx.strokeStyle = `rgba(25,25,20,${shadowAlpha})`;
+      ctx.lineWidth = 10;
+      ctx.lineCap = 'round';
       ctx.beginPath();
-      ctx.moveTo(px, py);
-      ctx.lineTo(px, groundY);
+      ctx.moveTo(pBase.sx,pBase.sy);
+      ctx.lineTo(pTip.sx,pTip.sy);
       ctx.stroke();
-      ctx.setLineDash([]);
-
-      ctx.fillStyle = color;
-      ctx.font = 'bold 14px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(peak.altDeg.toFixed(1)+'°', px, py-14);
-      ctx.textAlign = 'left';
+      ctx.lineCap = 'butt';
     }
-
-    // 일출/일몰 지점(수평선과 만나는 점)
-    const rise = sunPosition(decl, -H0), set = sunPosition(decl, H0);
-    ctx.fillStyle = color;
-    [rise, set].forEach(p=>{
-      const x = xOf(p.azFromSouthDeg);
-      ctx.beginPath();
-      ctx.arc(x, groundY, 4, 0, Math.PI*2);
-      ctx.fill();
-    });
+    // 나무
+    const pBase = project({x:baseX,y:0,z:baseZ});
+    const pTop = project({x:baseX,y:height,z:baseZ});
+    ctx.strokeStyle = '#6d4c2f';
+    ctx.lineWidth = 6;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(pBase.sx,pBase.sy);
+    ctx.lineTo(pTop.sx,pTop.sy);
+    ctx.stroke();
+    ctx.lineCap = 'butt';
+    ctx.fillStyle = canopyColor;
+    ctx.beginPath();
+    ctx.arc(pTop.sx, pTop.sy-10, 17, 0, Math.PI*2);
+    ctx.fill();
   }
 
   function drawScene(){
     const month = parseInt(document.getElementById('monthSlider').value, 10);
+    const hour = parseFloat(document.getElementById('hourSlider').value);
     const compare = document.getElementById('compareMode').checked;
+    const showEq = document.getElementById('showEquator').checked;
     const data = computeMonthData(month);
+    const Hdeg = (hour - 12) * 15;
+    const cur = sunPosition(data.decl, Hdeg);
 
     document.getElementById('monthVal').textContent = month + '월 21일 · ' + seasonOf(month);
+    document.getElementById('hourVal').textContent = fmtTime(hour);
     updateSliderFill(document.getElementById('monthSlider'));
+    updateSliderFill(document.getElementById('hourSlider'));
 
-    ctx.clearRect(0,0,W,H);
+    // ---- 하늘 배경 ----
+    const sky = skyColors(cur.altDeg);
+    const skyGrad = ctx.createLinearGradient(0,0,0,H*0.75);
+    skyGrad.addColorStop(0, sky.top);
+    skyGrad.addColorStop(1, sky.bottom);
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0,0,W,H);
 
-    // 땅
-    const groundGrad = ctx.createLinearGradient(0, groundY, 0, H);
-    groundGrad.addColorStop(0, '#9ed486');
-    groundGrad.addColorStop(1, '#5c9b4e');
-    ctx.fillStyle = groundGrad;
-    ctx.fillRect(0, groundY, W, H - groundY);
-    const horizonGrad = ctx.createLinearGradient(0, groundY, 0, groundY+14);
-    horizonGrad.addColorStop(0, 'rgba(50,80,40,0.28)');
-    horizonGrad.addColorStop(1, 'rgba(50,80,40,0)');
-    ctx.fillStyle = horizonGrad;
-    ctx.fillRect(0, groundY, W, 14);
-    for(let i=0;i<90;i++){
-      const gx = pseudoRandom(i*3.17) * W;
-      const gy = groundY + 4 + pseudoRandom(i*7.71) * (H - groundY - 10);
-      const lean = (pseudoRandom(i*5.31) - 0.5) * 5;
-      const blade = 3 + pseudoRandom(i*2.23) * 5;
-      ctx.strokeStyle = pseudoRandom(i*9.93) > 0.5 ? 'rgba(70,120,58,0.4)' : 'rgba(150,205,125,0.35)';
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      ctx.moveTo(gx, gy);
-      ctx.lineTo(gx+lean, gy-blade);
-      ctx.stroke();
+    // 별(밤에 가까울수록 진하게)
+    const starAlpha = clamp((-cur.altDeg-2)/20, 0, 0.9);
+    if(starAlpha > 0.02){
+      ctx.fillStyle = `rgba(255,255,255,${starAlpha})`;
+      for(let i=0;i<70;i++){
+        const sx = pseudoRandom(i*4.1)*W;
+        const sy = pseudoRandom(i*8.3)*H*0.55;
+        const r = 0.6 + pseudoRandom(i*2.7)*1.1;
+        ctx.beginPath();
+        ctx.arc(sx,sy,r,0,Math.PI*2);
+        ctx.fill();
+      }
     }
 
-    // 고도 눈금선(15°마다)
-    ctx.strokeStyle = 'rgba(90,80,60,0.18)';
-    ctx.fillStyle = 'rgba(90,80,60,0.55)';
-    ctx.font = '11px sans-serif';
-    ctx.textAlign = 'right';
-    ctx.lineWidth = 1;
-    for(let a=15; a<=90; a+=15){
-      const y = yOf(a);
-      ctx.beginPath();
-      ctx.moveTo(centerX - plotHalfW, y);
-      ctx.lineTo(centerX + plotHalfW, y);
-      ctx.stroke();
-      ctx.fillText(a+'°', centerX - plotHalfW - 6, y+4);
+    // ---- 천구(하늘) 실루엣 은은하게 ----
+    const skyDomeR = R_ARC * worldScale * 1.35;
+    const domeGrad = ctx.createRadialGradient(centerX, centerY - skyDomeR*0.25, skyDomeR*0.2, centerX, centerY - skyDomeR*0.1, skyDomeR);
+    domeGrad.addColorStop(0, 'rgba(255,255,255,0.16)');
+    domeGrad.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = domeGrad;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY - skyDomeR*0.1, skyDomeR, 0, Math.PI*2);
+    ctx.fill();
+
+    // ---- 지평선(수평 원) 테두리 ----
+    const hEll = groundEllipse(R_ARC);
+    ctx.strokeStyle = 'rgba(230,190,110,0.55)';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.ellipse(centerX, centerY, hEll.rh, hEll.rv, 0, 0, Math.PI*2);
+    ctx.stroke();
+
+    // ---- 천구의 적도(적위 0, 춘분/추분 궤적) ----
+    if(showEq){
+      const eqPts = pathAltAz(0, 90, 72);
+      strokeSkyPath(eqPts, R_ARC, 'rgba(150,158,180,0.75)', 1.6, [5,5]);
     }
-    ctx.textAlign = 'left';
 
-    // 방위(동/남/서) 표시
-    ctx.strokeStyle = 'rgba(70,60,40,0.5)';
-    ctx.fillStyle = 'rgba(60,50,30,0.85)';
-    ctx.font = 'bold 13px sans-serif';
-    ctx.textAlign = 'center';
-    [[-90,'동'],[0,'남'],[90,'서']].forEach(([az,label])=>{
-      const x = xOf(az);
-      ctx.beginPath();
-      ctx.setLineDash([3,4]);
-      ctx.moveTo(x, groundY);
-      ctx.lineTo(x, topPad);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.fillText(label, x, groundY+30);
-    });
-    ctx.textAlign = 'left';
-
+    // ---- 사계절 비교 궤적(옅게) ----
     if(compare){
       const seasons = [
-        { m:3,  label:'봄(3/21)',  color:'#5a9c46' },
-        { m:6,  label:'여름(6/21)', color:'#d94f2b' },
-        { m:9,  label:'가을(9/21)', color:'#c98a2e' },
-        { m:12, label:'겨울(12/21)', color:'#2f5fa8' }
+        { m:3,  color:'#5a9c46' },
+        { m:6,  color:'#d94f2b' },
+        { m:9,  color:'#c98a2e' },
+        { m:12, color:'#2f5fa8' }
       ];
       seasons.forEach(s=>{
         const d = computeMonthData(s.m);
-        drawArc(d.decl, d.H0, s.color, false, s.m===month ? 4 : 2.4);
+        const pts = pathAltAz(d.decl, d.H0, 72);
+        strokeSkyPath(pts, R_ARC, s.color, s.m===month ? 3.4 : 2, []);
       });
-      // 현재 슬라이더 월의 남중고도 라벨만 강조 표시
-      const cur = seasons.find(s=>s.m===month);
-      drawArc(data.decl, data.H0, cur ? cur.color : '#e0790f', true, 4);
-    } else {
-      drawArc(data.decl, data.H0, '#e0790f', true, 4.5);
     }
+
+    // ---- 이 달의 태양 궤적 ----
+    const curPts = pathAltAz(data.decl, data.H0, 72);
+    strokeSkyPath(curPts, R_ARC, '#e0790f', 4, []);
+    // 남중 지점 표시
+    const peak = sunPosition(data.decl, 0);
+    const pPeak = projectAltAz(peak.altDeg, peak.azFromSouthDeg, R_ARC);
+    ctx.fillStyle = '#e0790f';
+    ctx.beginPath();
+    ctx.arc(pPeak.sx, pPeak.sy, 5, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = '#a8540a';
+    ctx.font = 'bold 13px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('남중 ' + peak.altDeg.toFixed(1) + '°', pPeak.sx, pPeak.sy - 12);
+    ctx.textAlign = 'left';
+
+    // ---- 땅(원판: 잔디) ----
+    const gEll = groundEllipse(R_GROUND);
+    const groundGrad = ctx.createLinearGradient(0, centerY-gEll.rv, 0, centerY+gEll.rv);
+    groundGrad.addColorStop(0, '#8fc97a');
+    groundGrad.addColorStop(1, '#4f8a44');
+    ctx.fillStyle = groundGrad;
+    ctx.beginPath();
+    ctx.ellipse(centerX, centerY, gEll.rh, gEll.rv, 0, 0, Math.PI*2);
+    ctx.fill();
+    // 방위 안내용 옅은 격자(동서/남북 축 + 동심원)
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.ellipse(centerX, centerY, gEll.rh*0.66, gEll.rv*0.66, 0, 0, Math.PI*2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(centerX, centerY, gEll.rh*0.33, gEll.rv*0.33, 0, 0, Math.PI*2);
+    ctx.stroke();
+    [0,90,180,270].forEach(azDeg=>{
+      const edge = project(sphericalToXYZ(0, azDeg-180, R_GROUND));
+      ctx.beginPath();
+      ctx.moveTo(centerX, centerY);
+      ctx.lineTo(edge.sx, edge.sy);
+      ctx.stroke();
+    });
+
+    // ---- 나무 + 그림자 ----
+    const treeSpots = [
+      { x:-0.32, z:0.18, h:0.30, c:'#3f7a3a' },
+      { x:0.05,  z:0.34, h:0.20, c:'#5a9c46' },
+      { x:0.30,  z:0.10, h:0.26, c:'#4a8a40' }
+    ];
+    treeSpots.forEach(t=> drawTree(t.x, t.z, t.h, t.c, cur.altDeg, cur.azFromSouthDeg));
+
+    // ---- 방위 라벨(동/서/남/북) ----
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    ctx.font = 'bold 20px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = 'rgba(0,0,0,0.5)';
+    ctx.shadowBlur = 4;
+    [[-90,'동'],[90,'서'],[0,'남'],[180,'북']].forEach(([az,label])=>{
+      const p = project(sphericalToXYZ(0, az, R_ARC*1.02));
+      ctx.fillText(label, p.sx, p.sy+6);
+    });
+    ctx.shadowBlur = 0;
+    ctx.textAlign = 'left';
+
+    // ---- 북극성(위도 = 고도, 정북 방향에 항상 고정) ----
+    const poleAlt = LAT, poleAz = 180;
+    const pPole = projectAltAz(poleAlt, poleAz, R_ARC*1.05);
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(pPole.sx, pPole.sy, 4.5, 0, Math.PI*2);
+    ctx.fill();
+    ctx.shadowColor = 'rgba(0,0,0,0.6)';
+    ctx.shadowBlur = 3;
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 13px sans-serif';
+    ctx.fillText('북극성', pPole.sx+10, pPole.sy+4);
+    ctx.shadowBlur = 0;
+
+    // ---- 태양(현재 시각 위치) ----
+    if(cur.altDeg > -10){
+      const pSun = projectAltAz(Math.max(cur.altDeg,-10), cur.azFromSouthDeg, R_ARC);
+      const sunAlpha = clamp((cur.altDeg+10)/10, 0.15, 1);
+      ctx.globalAlpha = sunAlpha;
+      const glow = ctx.createRadialGradient(pSun.sx,pSun.sy,2,pSun.sx,pSun.sy,26);
+      glow.addColorStop(0,'rgba(255,220,140,0.9)');
+      glow.addColorStop(1,'rgba(255,220,140,0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(pSun.sx,pSun.sy,26,0,Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle = '#ffcf4d';
+      ctx.beginPath();
+      ctx.arc(pSun.sx,pSun.sy,12,0,Math.PI*2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+
+    // ---- HUD 텍스트 ----
+    document.getElementById('hudSeason').textContent = seasonOf(month) + ' (' + month + '월 21일)';
+    document.getElementById('hudTime').textContent = fmtTime(hour);
+    document.getElementById('hudAlt').textContent = (cur.altDeg>=0?'+':'') + cur.altDeg.toFixed(1) + '°';
 
     document.getElementById('altOut').textContent = data.alt.toFixed(1) + '°';
     document.getElementById('dayLenOut').textContent = fmtDuration(data.dayLen);
@@ -419,11 +580,13 @@
         '<span><i class="dot" style="background:#5a9c46"></i>봄(3/21)</span>' +
         '<span><i class="dot" style="background:#d94f2b"></i>여름(6/21)</span>' +
         '<span><i class="dot" style="background:#c98a2e"></i>가을(9/21)</span>' +
-        '<span><i class="dot" style="background:#2f5fa8"></i>겨울(12/21)</span>';
+        '<span><i class="dot" style="background:#2f5fa8"></i>겨울(12/21)</span>' +
+        '<span><i class="dot" style="background:#ffffff"></i>북극성</span>';
     } else {
       legend.innerHTML =
         '<span><i class="swatch" style="background:#e0790f"></i>선택한 달의 태양 궤적</span>' +
-        '<span><i class="dot" style="background:#e0790f"></i>남중(태양이 정남쪽에 위치)</span>';
+        '<span><i class="swatch" style="background:#9aa3b5;opacity:.8"></i>천구의 적도(춘분·추분 궤적)</span>' +
+        '<span><i class="dot" style="background:#ffffff"></i>북극성(항상 고정)</span>';
     }
   }
 
@@ -433,7 +596,7 @@
     slider.style.setProperty('--fill', pct + '%');
   }
 
-  ['monthSlider','compareMode'].forEach(id=>{
+  ['monthSlider','hourSlider','compareMode','showEquator'].forEach(id=>{
     document.getElementById(id).addEventListener('input', drawScene);
     document.getElementById(id).addEventListener('change', drawScene);
   });
