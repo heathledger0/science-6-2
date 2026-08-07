@@ -402,52 +402,47 @@
     ctx.lineTo(W, groundY);
     ctx.stroke();
 
-    // 태양 위치 계산 (막대기 기준점에서 왼쪽 위 방향으로 태양이 있다고 가정)
+    // 태양 광선의 기준점 계산 (막대기 기준점에서 왼쪽 위 방향으로, 태양 고도 각도만큼)
+    // 태양 그림은 그리지 않고, 빛이 들어오는 방향(화살표)만 보여줍니다.
     const baseX = W * 0.62;
-    const sunDist = 380;
+    const rayDist = 460; // 화살표 기준점을 더 왼쪽/위로 보내고 싶으면 이 값을 키우세요.
     const elevRad = deg2rad(elevDeg);
-    const sunX = baseX - Math.cos(elevRad) * sunDist;
-    const sunY = groundY - Math.sin(elevRad) * sunDist;
+    // 태양 고도가 아주 높거나 낮을 때도 화살표가 화면 안에 보이도록 기준점을 안전 범위로 고정합니다.
+    const rayAnchorX = Math.max(50, Math.min(W-50, baseX - Math.cos(elevRad) * rayDist));
+    const rayAnchorY = Math.max(50, groundY - Math.sin(elevRad) * rayDist);
 
-    // 태양 그리기
-    ctx.fillStyle = '#ffb703';
-    ctx.beginPath();
-    ctx.arc(sunX, sunY, 26, 0, Math.PI*2);
-    ctx.fill();
-    ctx.strokeStyle = '#ff9500';
-    ctx.lineWidth = 3;
-    for(let i=0;i<8;i++){
-      const a = i/8 * Math.PI*2;
-      ctx.beginPath();
-      ctx.moveTo(sunX + Math.cos(a)*32, sunY + Math.sin(a)*32);
-      ctx.lineTo(sunX + Math.cos(a)*42, sunY + Math.sin(a)*42);
-      ctx.stroke();
-    }
-
-    // 태양 광선(햇살) 표시: 태양에서 빛이 나오는 "방향"만 보여주는 장식 요소입니다.
-    // 막대기 끝까지 선을 이어 그리면, 막대기 길이가 서로 다를 때 광선이 태양의 고정된
-    // 위치에서 벗어나 붕 떠 보이는 문제가 생깁니다(태양은 각도로만 위치가 정해지는데,
-    // 막대 끝 높이는 막대기 길이마다 달라서 하나의 태양 지점에 모든 막대의 광선이
-    // 동시에 정확히 닿는 것은 기하학적으로 불가능합니다). 그래서 여기서는 광선을
-    // 막대와 억지로 연결하지 않고, 태양에서 같은 각도로 나란히 뻗어나가는 햇살로만
-    // 표현합니다. 실제 측정 각도는 항상 정확한 파란색 실(측정선)이 보여줍니다.
+    // 태양 광선 화살표 3개: 태양이 이 방향(태양 고도 각도)에서 빛을 보내고 있다는 것만
+    // 보여주는 장식 요소입니다. 막대기 끝까지 이어서 그리면, 막대기 길이가 서로 다를 때
+    // 광선이 특정 지점에서 벗어나 붕 떠 보이는 문제가 생기므로(막대 끝 높이가 제각각이라
+    // 하나의 지점에 모든 막대의 광선이 동시에 정확히 닿는 것은 기하학적으로 불가능합니다),
+    // 화살표는 막대와 연결하지 않습니다. 실제 측정 각도는 항상 정확한 파란색
+    // 실(측정선)이 보여줍니다.
     if(showRays.checked){
       const dx = Math.cos(elevRad), dy = Math.sin(elevRad);
       const perpX = -dy, perpY = dx;
-      ctx.strokeStyle = 'rgba(255,149,0,0.6)';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([6,5]);
-      [-18, 0, 18].forEach(offset=>{
-        const sx = sunX + perpX*offset + dx*46;
-        const sy = sunY + perpY*offset + dy*46;
-        const ex = sunX + perpX*offset + dx*150;
-        const ey = sunY + perpY*offset + dy*150;
+      const arrowLen = 120;
+      const headLen = 14;
+      ctx.strokeStyle = '#e0790f';
+      ctx.fillStyle = '#e0790f';
+      ctx.lineWidth = 3;
+      [-26, 0, 26].forEach(offset=>{
+        const sx = rayAnchorX + perpX*offset;
+        const sy = rayAnchorY + perpY*offset;
+        const ex = sx + dx*arrowLen;
+        const ey = sy + dy*arrowLen;
         ctx.beginPath();
         ctx.moveTo(sx, sy);
         ctx.lineTo(ex, ey);
         ctx.stroke();
+        // 화살촉
+        const ang = Math.atan2(dy, dx);
+        ctx.beginPath();
+        ctx.moveTo(ex, ey);
+        ctx.lineTo(ex - headLen*Math.cos(ang - Math.PI/7), ey - headLen*Math.sin(ang - Math.PI/7));
+        ctx.lineTo(ex - headLen*Math.cos(ang + Math.PI/7), ey - headLen*Math.sin(ang + Math.PI/7));
+        ctx.closePath();
+        ctx.fill();
       });
-      ctx.setLineDash([]);
     }
 
     const sticks = compareMode.checked ? [stickCm*0.6, stickCm, stickCm*1.6] : [stickCm];
