@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>계절별 태양 궤적 시뮬레이터</title>
+<style>
+  :root{
+    --paper:#f2efe6;
+    --panel:#fffdf8;
+    --panel-line:#e4ddc9;
+    --ink:#242019;
+    --ink-soft:#6b6355;
+    --grid-line:rgba(60,50,20,0.07);
+    --accent-sun:#c8720f;
+    --accent-sun-glow:#e69a2e;
+    --accent-sky:#2f5fa8;
+    --lcd-bg:#20261f;
+    --lcd-text:#8ff0a4;
+    --lcd-text-dim:#4f7a5c;
+    --focus:#2f5fa8;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --paper:#14120d;
+      --panel:#1e1b14;
+      --panel-line:#3a3427;
+      --ink:#efe9db;
+      --ink-soft:#b3a98f;
+      --grid-line:rgba(255,240,200,0.06);
+      --accent-sun:#e69a2e;
+      --accent-sun-glow:#f4b559;
+      --accent-sky:#7fabe0;
+      --lcd-bg:#0f1a11;
+      --lcd-text:#8ff0a4;
+      --lcd-text-dim:#3f6b4c;
+      --focus:#7fabe0;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#14120d; --panel:#1e1b14; --panel-line:#3a3427; --ink:#efe9db; --ink-soft:#b3a98f;
+    --grid-line:rgba(255,240,200,0.06); --accent-sun:#e69a2e; --accent-sun-glow:#f4b559;
+    --accent-sky:#7fabe0; --lcd-bg:#0f1a11; --lcd-text:#8ff0a4; --lcd-text-dim:#3f6b4c; --focus:#7fabe0;
+  }
+  :root[data-theme="light"]{
+    --paper:#f2efe6; --panel:#fffdf8; --panel-line:#e4ddc9; --ink:#242019; --ink-soft:#6b6355;
+    --grid-line:rgba(60,50,20,0.07); --accent-sun:#c8720f; --accent-sun-glow:#e69a2e;
+    --accent-sky:#2f5fa8; --lcd-bg:#20261f; --lcd-text:#8ff0a4; --lcd-text-dim:#4f7a5c; --focus:#2f5fa8;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0; min-height:100%;
+    font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+    color:var(--ink);
+    background:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
+      var(--paper);
+    background-size:24px 24px, 24px 24px, auto;
+    display:flex; flex-direction:column; align-items:center;
+    padding:20px 14px 40px;
+  }
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important;} }
+
+  .nameplate{ width:100%; max-width:920px; margin-bottom:14px; }
+  .eyebrow{
+    font-family:'SFMono-Regular','Consolas',monospace; font-size:.68rem; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--ink-soft);
+  }
+  h1{ font-size:clamp(1.3rem, 1rem + 1.4vw, 1.9rem); font-weight:800; letter-spacing:-.01em; margin:2px 0 0; text-wrap:balance; }
+  h1 .ico{ display:inline-block; }
+
+  .wrap{
+    width:100%; max-width:920px; background:var(--panel); border:1px solid var(--panel-line);
+    border-radius:18px; box-shadow:0 10px 30px rgba(30,25,10,0.10); padding:18px;
+  }
+  .screen{
+    position:relative; border-radius:14px; padding:8px;
+    background:linear-gradient(155deg, #d9d2bd, #c7bfa4);
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,0.15);
+  }
+  @media (prefers-color-scheme: dark){ .screen{ background:linear-gradient(155deg, #34301f, #221f16); } }
+  :root[data-theme="dark"] .screen{ background:linear-gradient(155deg, #34301f, #221f16); }
+  :root[data-theme="light"] .screen{ background:linear-gradient(155deg, #d9d2bd, #c7bfa4); }
+  canvas{
+    width:100%; height:auto;
+    background:linear-gradient(to bottom, #bfe3ff 0%, #eaf7ff 70%, #eaf7ff 100%);
+    border-radius:9px; display:block;
+  }
+
+  .legend{ display:flex; flex-wrap:wrap; gap:14px; margin-top:10px; padding:0 2px; }
+  .legend span{ display:inline-flex; align-items:center; gap:6px; font-size:.78rem; color:var(--ink-soft); }
+  .swatch{ width:16px; height:3px; border-radius:2px; display:inline-block; box-shadow:0 0 0 1px var(--panel-line); }
+  .dot{ width:9px; height:9px; border-radius:50%; display:inline-block; box-shadow:0 0 0 1px var(--panel-line); }
+
+  .panel{ margin-top:18px; display:grid; grid-template-columns:1fr; gap:14px; }
+  @media(min-width:640px){ .panel{ grid-template-columns:1fr 1fr; } }
+  .control{ background:var(--paper); border-radius:12px; padding:12px 14px; border:1px solid var(--panel-line); }
+  .control label{ display:flex; justify-content:space-between; align-items:baseline; font-weight:700; font-size:.92rem; margin-bottom:8px; }
+  .control .value{ font-family:'SFMono-Regular','Consolas',monospace; font-variant-numeric:tabular-nums; color:var(--accent-sky); font-weight:700; }
+
+  input[type=range]{
+    -webkit-appearance:none; appearance:none; width:100%; height:6px; border-radius:99px;
+    background:linear-gradient(90deg, var(--accent-sun-glow) 0%, var(--accent-sun-glow) var(--fill,50%), var(--panel-line) var(--fill,50%), var(--panel-line) 100%);
+    outline-offset:4px;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:20px; height:20px; border-radius:50%; background:var(--panel);
+    border:3px solid var(--accent-sun); box-shadow:0 1px 3px rgba(0,0,0,.3); cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:14px; height:14px; border-radius:50%; background:var(--panel); border:3px solid var(--accent-sun); cursor:pointer;
+  }
+  input[type=range]:focus-visible{ outline:2px solid var(--focus); }
+
+  .toggles{ display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+  .toggles label{
+    display:flex; align-items:center; gap:6px; background:var(--paper); border:1px solid var(--panel-line);
+    border-radius:999px; padding:7px 13px; font-size:.84rem; cursor:pointer; user-select:none;
+  }
+  .toggles input:focus-visible{ outline:2px solid var(--focus); }
+
+  .readout{ margin-top:16px; display:flex; flex-wrap:wrap; gap:10px; }
+  .badge{ flex:1; min-width:160px; background:var(--lcd-bg); border-radius:12px; padding:12px 14px; text-align:left; box-shadow:inset 0 0 0 1px rgba(255,255,255,0.04); }
+  .badge .num{ font-family:'SFMono-Regular','Consolas',monospace; font-variant-numeric:tabular-nums; font-size:1.4rem; font-weight:700; color:var(--lcd-text); text-shadow:0 0 10px rgba(143,240,164,0.35); }
+  .badge .lab{ margin-top:2px; font-size:.72rem; letter-spacing:.03em; color:var(--lcd-text-dim); }
+
+  .note{ margin-top:16px; font-size:.85rem; color:var(--ink); background:var(--paper); border:1px dashed var(--panel-line); border-radius:10px; padding:12px 14px; line-height:1.55; }
+  .note b{ color:var(--accent-sun); }
+</style>
+</head>
+<body>
+  <div class="nameplate">
+    <div class="eyebrow">SCIENCE LAB INSTRUMENT · 6학년 2학기 1단원 계절의 변화 (3~4차시)</div>
+    <h1><span class="ico">🌤️</span> 계절별 태양 궤적 시뮬레이터</h1>
+  </div>
+
+  <div class="wrap">
+    <div class="screen">
+      <canvas id="stage" width="900" height="500"></canvas>
+    </div>
+
+    <div class="legend" id="legend">
+      <span><i class="swatch" style="background:#e0790f"></i>선택한 달의 태양 궤적</span>
+      <span><i class="dot" style="background:#e0790f"></i>남중(태양이 정남쪽에 위치)</span>
+    </div>
+
+    <div class="panel">
+      <div class="control">
+        <label>월(매월 21일 기준) <span class="value" id="monthVal">6월 21일 · 여름</span></label>
+        <!-- 주요 변수: 월(1~12). 매월 21일 기준으로 서울(위도 37.5°N)의 실제 남중 고도·낮의 길이를
+             계산합니다. 하루 수업 중 학생들에게 봄→여름→가을→겨울 순서로 슬라이더를 천천히
+             움직이며 궤적이 점점 높아졌다 낮아지는 모습을 보여주세요. -->
+        <input type="range" id="monthSlider" min="1" max="12" step="1" value="6">
+      </div>
+      <div class="control">
+        <label>사계절 동시 비교 모드</label>
+        <div class="toggles" style="margin-top:0;">
+          <label><input type="checkbox" id="compareMode"> 봄·여름·가을·겨울 궤적 한눈에 비교</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="readout">
+      <div class="badge">
+        <div class="num" id="altOut">-</div>
+        <div class="lab">태양의 남중 고도</div>
+      </div>
+      <div class="badge">
+        <div class="num" id="dayLenOut">-</div>
+        <div class="lab">낮의 길이</div>
+      </div>
+      <div class="badge">
+        <div class="num" id="riseSetOut">-</div>
+        <div class="lab">일출 · 일몰(어림 시각)</div>
+      </div>
+    </div>
+
+    <div class="note">
+      💡 <b>활용 팁</b>: 슬라이더를 겨울(12월)에서 여름(6월)까지 천천히 움직이면서, 태양이 지나가는
+      길이 <b>점점 높아지고(남중 고도 증가) 동시에 옆으로도 점점 넓어지는(낮의 길이 증가)</b> 모습을
+      함께 보여주세요. "사계절 동시 비교" 모드를 켜면 네 계절의 궤적을 한 화면에서 바로 비교할 수
+      있습니다. (서울 기준 실제 천문 계산값이며, 지역마다 값이 조금씩 다를 수 있습니다.)
+    </div>
+  </div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('stage');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const groundY = H * 0.84;
+  const topPad = 50;
+  const plotH = groundY - topPad;
+  const maxAltForScale = 90; // 세로축(고도) 스케일의 최댓값
+  const centerX = W * 0.5;
+  const azHalfRangeDeg = 135; // 가로축(남쪽 기준 방위각) 표시 범위: -135°~+135°
+  const plotHalfW = W * 0.43;
+
+  const LAT = 37.5; // 시뮬레이션 기준 위도(서울)
+
+  function deg2rad(d){ return d * Math.PI / 180; }
+  function rad2deg(r){ return r * 180 / Math.PI; }
+
+  // 시드 기반 의사난수(잔디 등 고정 질감을 위해 사용, 매 프레임 흔들리지 않음)
+  function pseudoRandom(seed){
+    const x = Math.sin(seed * 12.9898) * 43758.5453;
+    return x - Math.floor(x);
+  }
+
+  const CUM_DAYS = [0,31,59,90,120,151,181,212,243,273,304,334];
+  function dayOfYear21st(month){ return CUM_DAYS[month-1] + 21; }
+  function declination(doy){ return 23.44 * Math.sin(2*Math.PI/365 * (doy - 81)); }
+  function noonAltitude(decl){ return 90 - LAT + decl; }
+  function halfDayHourAngleDeg(decl){
+    const latR = deg2rad(LAT), decR = deg2rad(decl);
+    let cosH0 = -Math.tan(latR) * Math.tan(decR);
+    cosH0 = Math.max(-1, Math.min(1, cosH0));
+    return rad2deg(Math.acos(cosH0));
+  }
+  function dayLengthHours(H0deg){ return H0deg * 2 * 24 / 360; }
+  // 시간각(Hdeg, 남중=0)에서의 태양 고도·방위각(남쪽 기준, 동쪽은 음수/서쪽은 양수)을 계산
+  function sunPosition(decl, Hdeg){
+    const latR = deg2rad(LAT), decR = deg2rad(decl), H = deg2rad(Hdeg);
+    let sinAlt = Math.sin(latR)*Math.sin(decR) + Math.cos(latR)*Math.cos(decR)*Math.cos(H);
+    sinAlt = Math.max(-1, Math.min(1, sinAlt));
+    const alt = Math.asin(sinAlt);
+    let cosA = (Math.sin(decR) - Math.sin(latR)*sinAlt) / (Math.cos(latR)*Math.cos(alt));
+    cosA = Math.max(-1, Math.min(1, cosA));
+    let A = Math.acos(cosA); // 0~180, 북쪽 기준
+    if(Hdeg > 0) A = 2*Math.PI - A;
+    return { altDeg: rad2deg(alt), azFromSouthDeg: rad2deg(A) - 180 };
+  }
+  function seasonOf(month){
+    if(month>=3 && month<=5) return '봄';
+    if(month>=6 && month<=8) return '여름';
+    if(month>=9 && month<=11) return '가을';
+    return '겨울';
+  }
+  function fmtTime(hoursDecimal){
+    let h = Math.floor(hoursDecimal);
+    let m = Math.round((hoursDecimal - h) * 60);
+    if(m === 60){ m = 0; h += 1; }
+    return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
+  }
+  // 낮의 길이는 "시각"이 아니라 "기간"이므로 시:분 대신 'N시간 M분'으로 표기해 혼동을 막음
+  function fmtDuration(hoursDecimal){
+    let h = Math.floor(hoursDecimal);
+    let m = Math.round((hoursDecimal - h) * 60);
+    if(m === 60){ m = 0; h += 1; }
+    return h + '시간 ' + m + '분';
+  }
+
+  function xOf(az){ return centerX + (az / azHalfRangeDeg) * plotHalfW; }
+  function yOf(alt){ return groundY - (alt / maxAltForScale) * plotH; }
+
+  function computeMonthData(month){
+    const decl = declination(dayOfYear21st(month));
+    const H0 = halfDayHourAngleDeg(decl);
+    const alt = noonAltitude(decl);
+    const dayLen = dayLengthHours(H0);
+    return { decl, H0, alt, dayLen };
+  }
+
+  function pathPoints(decl, H0){
+    const pts = [];
+    const steps = 60;
+    for(let i=0;i<=steps;i++){
+      const Hdeg = -H0 + (2*H0)*(i/steps);
+      const p = sunPosition(decl, Hdeg);
+      pts.push(p);
+    }
+    return pts;
+  }
+
+  function drawArc(decl, H0, color, showPeakLabel, lineWidth){
+    const pts = pathPoints(decl, H0);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineWidth;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    pts.forEach((p, i)=>{
+      const x = xOf(p.azFromSouthDeg), y = yOf(Math.max(0,p.altDeg));
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+
+    // 남중(정점) 표시
+    const peak = sunPosition(decl, 0);
+    const px = xOf(peak.azFromSouthDeg), py = yOf(peak.altDeg);
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(px, py, 6, 0, Math.PI*2);
+    ctx.fill();
+
+    if(showPeakLabel){
+      ctx.strokeStyle = 'rgba(80,70,50,0.4)';
+      ctx.lineWidth = 1.4;
+      ctx.setLineDash([4,4]);
+      ctx.beginPath();
+      ctx.moveTo(px, py);
+      ctx.lineTo(px, groundY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = color;
+      ctx.font = 'bold 14px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(peak.altDeg.toFixed(1)+'°', px, py-14);
+      ctx.textAlign = 'left';
+    }
+
+    // 일출/일몰 지점(수평선과 만나는 점)
+    const rise = sunPosition(decl, -H0), set = sunPosition(decl, H0);
+    ctx.fillStyle = color;
+    [rise, set].forEach(p=>{
+      const x = xOf(p.azFromSouthDeg);
+      ctx.beginPath();
+      ctx.arc(x, groundY, 4, 0, Math.PI*2);
+      ctx.fill();
+    });
+  }
+
+  function drawScene(){
+    const month = parseInt(document.getElementById('monthSlider').value, 10);
+    const compare = document.getElementById('compareMode').checked;
+    const data = computeMonthData(month);
+
+    document.getElementById('monthVal').textContent = month + '월 21일 · ' + seasonOf(month);
+    updateSliderFill(document.getElementById('monthSlider'));
+
+    ctx.clearRect(0,0,W,H);
+
+    // 땅
+    const groundGrad = ctx.createLinearGradient(0, groundY, 0, H);
+    groundGrad.addColorStop(0, '#9ed486');
+    groundGrad.addColorStop(1, '#5c9b4e');
+    ctx.fillStyle = groundGrad;
+    ctx.fillRect(0, groundY, W, H - groundY);
+    const horizonGrad = ctx.createLinearGradient(0, groundY, 0, groundY+14);
+    horizonGrad.addColorStop(0, 'rgba(50,80,40,0.28)');
+    horizonGrad.addColorStop(1, 'rgba(50,80,40,0)');
+    ctx.fillStyle = horizonGrad;
+    ctx.fillRect(0, groundY, W, 14);
+    for(let i=0;i<90;i++){
+      const gx = pseudoRandom(i*3.17) * W;
+      const gy = groundY + 4 + pseudoRandom(i*7.71) * (H - groundY - 10);
+      const lean = (pseudoRandom(i*5.31) - 0.5) * 5;
+      const blade = 3 + pseudoRandom(i*2.23) * 5;
+      ctx.strokeStyle = pseudoRandom(i*9.93) > 0.5 ? 'rgba(70,120,58,0.4)' : 'rgba(150,205,125,0.35)';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(gx, gy);
+      ctx.lineTo(gx+lean, gy-blade);
+      ctx.stroke();
+    }
+
+    // 고도 눈금선(15°마다)
+    ctx.strokeStyle = 'rgba(90,80,60,0.18)';
+    ctx.fillStyle = 'rgba(90,80,60,0.55)';
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.lineWidth = 1;
+    for(let a=15; a<=90; a+=15){
+      const y = yOf(a);
+      ctx.beginPath();
+      ctx.moveTo(centerX - plotHalfW, y);
+      ctx.lineTo(centerX + plotHalfW, y);
+      ctx.stroke();
+      ctx.fillText(a+'°', centerX - plotHalfW - 6, y+4);
+    }
+    ctx.textAlign = 'left';
+
+    // 방위(동/남/서) 표시
+    ctx.strokeStyle = 'rgba(70,60,40,0.5)';
+    ctx.fillStyle = 'rgba(60,50,30,0.85)';
+    ctx.font = 'bold 13px sans-serif';
+    ctx.textAlign = 'center';
+    [[-90,'동'],[0,'남'],[90,'서']].forEach(([az,label])=>{
+      const x = xOf(az);
+      ctx.beginPath();
+      ctx.setLineDash([3,4]);
+      ctx.moveTo(x, groundY);
+      ctx.lineTo(x, topPad);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillText(label, x, groundY+30);
+    });
+    ctx.textAlign = 'left';
+
+    if(compare){
+      const seasons = [
+        { m:3,  label:'봄(3/21)',  color:'#5a9c46' },
+        { m:6,  label:'여름(6/21)', color:'#d94f2b' },
+        { m:9,  label:'가을(9/21)', color:'#c98a2e' },
+        { m:12, label:'겨울(12/21)', color:'#2f5fa8' }
+      ];
+      seasons.forEach(s=>{
+        const d = computeMonthData(s.m);
+        drawArc(d.decl, d.H0, s.color, false, s.m===month ? 4 : 2.4);
+      });
+      // 현재 슬라이더 월의 남중고도 라벨만 강조 표시
+      const cur = seasons.find(s=>s.m===month);
+      drawArc(data.decl, data.H0, cur ? cur.color : '#e0790f', true, 4);
+    } else {
+      drawArc(data.decl, data.H0, '#e0790f', true, 4.5);
+    }
+
+    document.getElementById('altOut').textContent = data.alt.toFixed(1) + '°';
+    document.getElementById('dayLenOut').textContent = fmtDuration(data.dayLen);
+    const sunrise = 12 - data.dayLen/2, sunset = 12 + data.dayLen/2;
+    document.getElementById('riseSetOut').textContent = fmtTime(sunrise) + ' · ' + fmtTime(sunset);
+
+    const legend = document.getElementById('legend');
+    if(compare){
+      legend.innerHTML =
+        '<span><i class="dot" style="background:#5a9c46"></i>봄(3/21)</span>' +
+        '<span><i class="dot" style="background:#d94f2b"></i>여름(6/21)</span>' +
+        '<span><i class="dot" style="background:#c98a2e"></i>가을(9/21)</span>' +
+        '<span><i class="dot" style="background:#2f5fa8"></i>겨울(12/21)</span>';
+    } else {
+      legend.innerHTML =
+        '<span><i class="swatch" style="background:#e0790f"></i>선택한 달의 태양 궤적</span>' +
+        '<span><i class="dot" style="background:#e0790f"></i>남중(태양이 정남쪽에 위치)</span>';
+    }
+  }
+
+  function updateSliderFill(slider){
+    const min = parseFloat(slider.min), max = parseFloat(slider.max), v = parseFloat(slider.value);
+    const pct = ((v - min) / (max - min)) * 100;
+    slider.style.setProperty('--fill', pct + '%');
+  }
+
+  ['monthSlider','compareMode'].forEach(id=>{
+    document.getElementById(id).addEventListener('input', drawScene);
+    document.getElementById(id).addEventListener('change', drawScene);
+  });
+
+  drawScene();
+})();
+</script>
+</body>
+</html>
