@@ -87,6 +87,7 @@
     text-align:center; font-weight:800; font-size:1.05rem; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.5);
     line-height:1.2; white-space:nowrap;
   }
+  .wheel-label.flip span{ transform:translateY(150px) rotate(180deg); }
   .wheel-hub{
     position:absolute; left:50%; top:50%; width:54px; height:54px; margin:-27px 0 0 -27px;
     border-radius:50%; background:var(--panel); border:3px solid var(--accent-sun);
@@ -415,9 +416,10 @@
       const color = segColor(seg, i);
       gradientParts.push(color + ' ' + start + 'deg ' + end + 'deg');
 
+      const centerAngle = (start + segAng/2) % 360;
       const labelWrap = document.createElement('div');
-      labelWrap.className = 'wheel-label';
-      labelWrap.style.transform = 'rotate(' + (start + segAng/2) + 'deg)';
+      labelWrap.className = 'wheel-label' + (centerAngle > 90 && centerAngle < 270 ? ' flip' : '');
+      labelWrap.style.transform = 'rotate(' + centerAngle + 'deg)';
       labelWrap.id = 'seg-' + i;
       const span = document.createElement('span');
       span.textContent = segLabel(seg) + (seg.type==='question' && seg.used ? ' ✔' : '');
