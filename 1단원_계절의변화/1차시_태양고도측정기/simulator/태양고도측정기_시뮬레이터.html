@@ -440,13 +440,20 @@
       const shadowX = x + shadowPx;
 
       // 태양 광선(막대 끝~태양)
+      // 주의: 태양은 화면 위 고정된 한 점(sunX, sunY)에 그려지지만, 실제 태양 빛은 아주 멀리서
+      // 평행하게 들어옵니다. 그래서 광선은 "고정된 태양 위치"가 아니라 실제 태양 고도 각도
+      // (cos·sin 방향)를 그대로 사용해 막대 끝에서 뒤로 연장해야, 막대기 길이가 아무리 달라져도
+      // 그림자(실)와 항상 정확히 일직선을 이룹니다. (고정된 점을 향해 그리면 막대기가 길어질수록
+      // 실제 각도와 어긋나 보이는 오류가 생깁니다.)
       if(showRays.checked){
+        const rayEndX = topX - Math.cos(elevRad) * sunDist;
+        const rayEndY = topY - Math.sin(elevRad) * sunDist;
         ctx.strokeStyle = 'rgba(255,149,0,0.55)';
         ctx.lineWidth = 2;
         ctx.setLineDash([6,5]);
         ctx.beginPath();
         ctx.moveTo(topX, topY);
-        ctx.lineTo(sunX, sunY);
+        ctx.lineTo(rayEndX, rayEndY);
         ctx.stroke();
         ctx.setLineDash([]);
       }
