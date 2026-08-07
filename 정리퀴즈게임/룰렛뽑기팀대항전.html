@@ -167,6 +167,28 @@
   .award-row .skip{ opacity:.75; }
 
   .hint{ margin-top:14px; font-size:.8rem; color:var(--ink-soft); text-align:center; max-width:1080px; }
+
+  /* --- 문제 편집 --- */
+  .qedit-box{ width:100%; max-width:1080px; }
+  .qedit-toggle-row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .filelbl{
+    font-size:.82rem; background:var(--paper); border:1px solid var(--panel-line);
+    border-radius:10px; padding:8px 12px; cursor:pointer; font-weight:700;
+  }
+  .filelbl:hover{ border-color:var(--accent-sun); }
+  .qedit-panel{ margin-top:12px; }
+  .qedit-help{ font-size:.8rem; color:var(--ink-soft); margin:0 0 8px; line-height:1.55; }
+  .qedit-help b{ color:var(--ink); }
+  #qeditArea{
+    width:100%; min-height:180px; font-family:'SFMono-Regular','Consolas',monospace; font-size:.85rem;
+    padding:10px; border-radius:8px; border:1px solid var(--panel-line); background:var(--paper);
+    color:var(--ink); resize:vertical;
+  }
+  .qedit-status{ font-size:.8rem; margin-top:8px; color:var(--accent-good); white-space:pre-line; }
+  .qedit-status.err{ color:#c8402f; }
+  .qedit-btnrow{ display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:10px; }
+  .qedit-btnrow .btn{ border:none; border-radius:12px; padding:11px 20px; font-weight:800; font-size:.9rem; cursor:pointer; background:var(--accent-sun); color:#fff; }
+  .qedit-btnrow .btn.secondary{ background:var(--paper); color:var(--ink); border:1px solid var(--panel-line); }
 </style>
 </head>
 <body>
@@ -209,7 +231,24 @@
     </div>
   </div>
 
-  <p class="hint">문제 내용은 파일 상단 QUESTIONS / SEGMENTS 배열을 수정해 다음 차시 것으로 바꿔 쓸 수 있어요. 더블찬스 칸에 걸리면 같은 모둠이 한 번 더 돌리고, 꽝 칸은 다음 모둠으로 순서가 넘어갑니다.</p>
+  <div class="panel-box qedit-box">
+    <div class="qedit-toggle-row">
+      <button class="iconbtn" id="qeditToggleBtn" type="button">✏️ 문제 편집(붙여넣기)</button>
+      <label class="filelbl">📂 파일 불러오기<input type="file" id="qeditFile" accept=".txt,.csv" style="display:none;"></label>
+      <span class="eyebrow" style="margin-left:auto;">더블찬스=같은 모둠 재도전 · 꽝=다음 모둠 차례</span>
+    </div>
+    <div class="qedit-panel" id="qeditPanel" style="display:none;">
+      <p class="qedit-help">한 줄에 문제 하나씩 <b>질문 | 정답</b> 형식으로 입력하세요. 엑셀·구글시트에 표로 정리해 둔 뒤 그대로 복사해서 붙여넣어도(탭 구분) 자동으로 인식돼요. 문제 개수에 맞춰 룰렛 칸 수도 자동으로 다시 배치됩니다. 저장 내용은 이 브라우저에 남아 다음 수업 때도 유지돼요.</p>
+      <textarea id="qeditArea" rows="9" spellcheck="false"></textarea>
+      <div class="qedit-status" id="qeditStatus"></div>
+      <div class="qedit-btnrow">
+        <button class="btn" id="qeditSaveBtn" type="button">💾 이 문제로 저장하고 새 게임 시작</button>
+        <button class="btn secondary" id="qeditResetBtn" type="button">↺ 기본 문제로 초기화</button>
+      </div>
+    </div>
+  </div>
+
+  <p class="hint">더블찬스 칸에 걸리면 같은 모둠이 한 번 더 돌리고, 꽝 칸은 다음 모둠으로 순서가 넘어갑니다.</p>
 
   <!-- 결과 모달 -->
   <div class="modal-backdrop" id="modalBackdrop">
@@ -228,8 +267,9 @@
 
 <script>
 (function(){
-  // ▼▼▼ 문제 내용 (1차시 태양 고도 측정기 기준). 다음 차시로 넘어가면 이 배열만 바꿔 쓰세요. ▼▼▼
-  const QUESTIONS = [
+  const STORAGE_KEY = 'rouletteQuizQuestions_v1';
+  // ▼▼▼ 기본 문제 내용 (1차시 태양 고도 측정기 기준). 화면의 '문제 편집' 버튼으로 언제든 다른 차시 문제로 바꿔 쓸 수 있어요. ▼▼▼
+  const DEFAULT_QUESTIONS = [
     { q:"태양의 높이를 나타내는 값을 무엇이라고 할까요?", a:"태양 고도" },
     { q:"태양 고도를 측정할 때, 막대기 끝에 묶은 실이 그림자와 이루는 각을 무엇으로 읽나요?", a:"각도기" },
     { q:"막대기 길이가 2배가 되면 그림자 길이는 어떻게 될까요?", a:"그림자도 2배로 길어져요 (막대와 그림자의 비율은 항상 일정!)" },
@@ -241,27 +281,71 @@
     { q:"태양 고도 측정기가 기울어져 있으면 어떤 문제가 생길까요?", a:"그림자 길이가 왜곡되어 정확한 각도를 잴 수 없어요(오차 발생)" },
     { q:"태양을 관찰할 때 절대로 하면 안 되는 행동은 무엇일까요?", a:"태양을 직접 눈으로 쳐다보는 것 (눈 손상 위험!)" }
   ];
-  // 12칸 룰렛 배치: 문제 인덱스(points) + 더블찬스 + 꽝
-  const SEGMENTS = [
-    { type:'question', qi:0, points:10 },
-    { type:'question', qi:1, points:20 },
-    { type:'double' },
-    { type:'question', qi:2, points:10 },
-    { type:'question', qi:3, points:30 },
-    { type:'question', qi:4, points:20 },
-    { type:'blank' },
-    { type:'question', qi:5, points:10 },
-    { type:'question', qi:6, points:30 },
-    { type:'question', qi:7, points:20 },
-    { type:'question', qi:8, points:10 },
-    { type:'question', qi:9, points:30 }
-  ];
-  // ▲▲▲ 여기까지 문제 내용 ▲▲▲
+  // ▲▲▲ 여기까지 기본 문제 내용 ▲▲▲
+
+  // 문제 개수에 맞춰 룰렛 칸(점수 문제 + 더블찬스 + 꽝)을 자동으로 배치
+  function buildSegments(questions){
+    const N = Math.max(1, questions.length);
+    const pointsCycle = [10, 20, 30];
+    const pool = questions.map((q, i)=>({ type:'question', qi:i, points:pointsCycle[i % pointsCycle.length] }));
+    const specialCount = Math.max(1, Math.round(N / 5));
+    const totalSpecialsNeeded = specialCount * 2;
+    const gap = Math.max(2, Math.floor(N / totalSpecialsNeeded) || 2);
+    const result = [];
+    let toggle = 0, sinceSpecial = 0;
+    pool.forEach((seg)=>{
+      result.push(seg);
+      sinceSpecial++;
+      const specialsSoFar = result.filter(s=>s.type!=='question').length;
+      if(sinceSpecial >= gap && specialsSoFar < totalSpecialsNeeded){
+        result.push(toggle % 2 === 0 ? {type:'double'} : {type:'blank'});
+        toggle++; sinceSpecial = 0;
+      }
+    });
+    while(result.filter(s=>s.type!=='question').length < totalSpecialsNeeded){
+      result.push(toggle % 2 === 0 ? {type:'double'} : {type:'blank'});
+      toggle++;
+    }
+    return result;
+  }
+
+  function loadSavedQuestions(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : null;
+      if(Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }catch(e){}
+    return null;
+  }
+
+  function questionsToText(qs){
+    return qs.map(q => [q.q, q.a].join(' | ')).join('\n');
+  }
+
+  function parseQuestionsText(text){
+    const lines = text.split('\n').map(l=>l.trim()).filter(l=>l.length>0 && !l.startsWith('#'));
+    const out = [];
+    const errors = [];
+    lines.forEach((line, i)=>{
+      const cells = line.includes('\t') ? line.split('\t') : line.split('|');
+      const q = (cells[0]||'').trim();
+      const a = (cells[1]||'').trim();
+      if(!q || !a){
+        errors.push((i+1) + '번째 줄 형식을 확인해주세요 → ' + line);
+        return;
+      }
+      out.push({ q, a });
+    });
+    return { out, errors };
+  }
+
+  let QUESTIONS = loadSavedQuestions() || DEFAULT_QUESTIONS.slice();
+  let SEGMENTS = buildSegments(QUESTIONS);
 
   const COLORS = ['#c8720f','#2f7d54','#2a6fdb','#8a5cc9','#c8402f'];
   const DOUBLE_COLOR = '#e0b400';
   const BLANK_COLOR = '#7a7266';
-  const SEG_ANGLE = 360 / SEGMENTS.length;
+  function segAngle(){ return 360 / SEGMENTS.length; }
 
   let teams = [];
   let currentTeamIndex = 0;
@@ -288,6 +372,14 @@
   const closeModalBtn = document.getElementById('closeModalBtn');
   const awardRow = document.getElementById('awardRow');
 
+  const qeditToggleBtn = document.getElementById('qeditToggleBtn');
+  const qeditPanel = document.getElementById('qeditPanel');
+  const qeditArea = document.getElementById('qeditArea');
+  const qeditStatus = document.getElementById('qeditStatus');
+  const qeditSaveBtn = document.getElementById('qeditSaveBtn');
+  const qeditResetBtn = document.getElementById('qeditResetBtn');
+  const qeditFile = document.getElementById('qeditFile');
+
   function segLabel(seg){
     if(seg.type === 'double') return '2배';
     if(seg.type === 'blank') return '꽝';
@@ -302,15 +394,16 @@
   function buildWheel(){
     let gradientParts = [];
     wheelLabels.innerHTML = '';
+    const segAng = segAngle();
     SEGMENTS.forEach((seg, i)=>{
-      const start = i * SEG_ANGLE;
-      const end = start + SEG_ANGLE;
+      const start = i * segAng;
+      const end = start + segAng;
       const color = segColor(seg, i);
       gradientParts.push(color + ' ' + start + 'deg ' + end + 'deg');
 
       const labelWrap = document.createElement('div');
       labelWrap.className = 'wheel-label';
-      labelWrap.style.transform = 'rotate(' + (start + SEG_ANGLE/2) + 'deg)';
+      labelWrap.style.transform = 'rotate(' + (start + segAng/2) + 'deg)';
       labelWrap.id = 'seg-' + i;
       const span = document.createElement('span');
       span.textContent = segLabel(seg) + (seg.type==='question' && seg.used ? ' ✔' : '');
@@ -388,7 +481,7 @@
     teams = makeDefaultTeams(n);
     currentTeamIndex = 0;
     doubleActive = false;
-    SEGMENTS.forEach(s=>{ if(s.type==='question') s.used = false; });
+    SEGMENTS = buildSegments(QUESTIONS);
     currentRotation = 0;
     wheel.style.transition = 'none';
     wheel.style.transform = 'rotate(0deg)';
@@ -418,7 +511,8 @@
     spinBtn.disabled = true;
     const segIndex = pickSegmentIndex();
     currentSegIndex = segIndex;
-    const center = segIndex * SEG_ANGLE + SEG_ANGLE/2;
+    const segAng = segAngle();
+    const center = segIndex * segAng + segAng/2;
     const base = (360 - center) % 360;
     const diff = ((base - (currentRotation % 360)) + 360) % 360;
     const extraSpins = 5;
@@ -553,6 +647,58 @@
   document.getElementById('fsBtn').addEventListener('click', ()=>{
     if(!document.fullscreenElement){ document.documentElement.requestFullscreen().catch(()=>{}); }
     else{ document.exitFullscreen().catch(()=>{}); }
+  });
+
+  qeditToggleBtn.addEventListener('click', ()=>{
+    const opening = qeditPanel.style.display === 'none';
+    qeditPanel.style.display = opening ? '' : 'none';
+    if(opening){
+      qeditArea.value = questionsToText(QUESTIONS);
+      qeditStatus.textContent = '';
+      qeditStatus.classList.remove('err');
+    }
+  });
+
+  qeditSaveBtn.addEventListener('click', ()=>{
+    const { out, errors } = parseQuestionsText(qeditArea.value);
+    if(errors.length){
+      qeditStatus.classList.add('err');
+      qeditStatus.textContent = errors.join('\n');
+      return;
+    }
+    if(out.length === 0){
+      qeditStatus.classList.add('err');
+      qeditStatus.textContent = '문제를 1개 이상 입력해주세요.';
+      return;
+    }
+    QUESTIONS = out;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(out));
+    qeditStatus.classList.remove('err');
+    qeditStatus.textContent = out.length + '문항 저장 완료! 룰렛을 새 문제로 다시 준비했어요.';
+    resetGame();
+  });
+
+  qeditResetBtn.addEventListener('click', ()=>{
+    localStorage.removeItem(STORAGE_KEY);
+    QUESTIONS = DEFAULT_QUESTIONS.slice();
+    qeditArea.value = questionsToText(QUESTIONS);
+    qeditStatus.classList.remove('err');
+    qeditStatus.textContent = '기본 문제(1차시)로 초기화했어요.';
+    resetGame();
+  });
+
+  qeditFile.addEventListener('change', ()=>{
+    const file = qeditFile.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      qeditArea.value = String(reader.result || '');
+      qeditPanel.style.display = '';
+      qeditStatus.classList.remove('err');
+      qeditStatus.textContent = '파일을 불러왔어요. 내용을 확인하고 저장 버튼을 눌러주세요.';
+    };
+    reader.readAsText(file, 'utf-8');
+    qeditFile.value = '';
   });
 
   resetGame();

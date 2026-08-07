@@ -97,6 +97,23 @@
   .bigbtn:hover{ filter:brightness(1.08); }
   .bigbtn:active{ transform:translateY(1px); }
 
+  .qedit-toggle-row{ display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:2px; }
+  .filelbl{
+    font-size:.82rem; background:var(--panel); border:1px solid var(--panel-line);
+    border-radius:10px; padding:8px 12px; cursor:pointer; font-weight:700;
+  }
+  .filelbl:hover{ border-color:var(--accent-sun); }
+  .qedit-panel{ width:100%; max-width:640px; margin-top:6px; background:var(--paper); border:1px dashed var(--panel-line); border-radius:12px; padding:14px; text-align:left; }
+  .qedit-help{ font-size:.8rem; color:var(--ink-soft); margin:0 0 8px; line-height:1.55; }
+  .qedit-help b{ color:var(--ink); }
+  #qeditArea{
+    width:100%; min-height:160px; font-family:'SFMono-Regular','Consolas',monospace; font-size:.85rem;
+    padding:10px; border-radius:8px; border:1px solid var(--panel-line); background:var(--panel);
+    color:var(--ink); resize:vertical;
+  }
+  .qedit-status{ font-size:.8rem; margin-top:8px; color:var(--accent-o); white-space:pre-line; }
+  .qedit-status.err{ color:var(--accent-x); }
+
   /* --- 문제 화면 --- */
   .quiz-screen{ display:none; flex:1; flex-direction:column; }
   .progress-row{ display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
@@ -192,7 +209,21 @@
         <label><input type="checkbox" id="soundToggle" checked style="margin:0;"> 카운트다운 효과음</label>
       </div>
       <button class="bigbtn" id="startBtn" type="button">▶ 게임 시작</button>
-      <p class="hint" style="margin-top:2px;">문제 내용은 파일 상단 QUESTIONS 배열을 수정해 다음 차시 것으로 바꿔 쓸 수 있어요.</p>
+
+      <div class="qedit-toggle-row">
+        <button class="iconbtn" id="qeditToggleBtn" type="button">✏️ 문제 편집(붙여넣기)</button>
+        <label class="filelbl">📂 파일 불러오기<input type="file" id="qeditFile" accept=".txt,.csv" style="display:none;"></label>
+      </div>
+      <div class="qedit-panel" id="qeditPanel" style="display:none;">
+        <p class="qedit-help">한 줄에 문제 하나씩 <b>문장 | O또는X | 설명(선택)</b> 형식으로 입력하세요. 엑셀·구글시트에 표로 정리해 둔 뒤 그대로 복사해서 붙여넣어도(탭 구분) 자동으로 인식돼요. 저장하면 이 브라우저에 계속 남아있어서, 다음 수업 때 열어도 그대로예요.</p>
+        <textarea id="qeditArea" rows="8" spellcheck="false"></textarea>
+        <div class="qedit-status" id="qeditStatus"></div>
+        <div class="control-row" style="margin-top:8px;">
+          <button class="btn" id="qeditSaveBtn" type="button">💾 이 문제로 저장</button>
+          <button class="btn secondary" id="qeditResetBtn" type="button">↺ 기본 문제로 초기화</button>
+        </div>
+      </div>
+      <p class="hint" style="margin-top:2px;">문제는 언제든 위 '문제 편집' 버튼으로 새로 붙여넣어 다음 차시 것으로 바꿔 쓸 수 있어요.</p>
     </div>
 
     <!-- 문제 화면 -->
@@ -233,8 +264,9 @@
 
 <script>
 (function(){
-  // ▼▼▼ 문제 내용 (1차시 태양 고도 측정기 기준). 다음 차시로 넘어가면 이 배열만 바꿔 쓰세요. ▼▼▼
-  const QUESTIONS = [
+  const STORAGE_KEY = 'oxQuizQuestions_v1';
+  // ▼▼▼ 기본 문제 내용 (1차시 태양 고도 측정기 기준). 화면의 '문제 편집' 버튼으로 언제든 다른 차시 문제로 바꿔 쓸 수 있어요. ▼▼▼
+  const DEFAULT_QUESTIONS = [
     { stmt:"태양 고도란 태양이 지표면과 이루는 각을 말한다.", answer:true,
       explain:"태양 고도는 태양의 높이를 나타내는 값으로, 태양과 지표면이 이루는 각입니다." },
     { stmt:"막대기(수수깡)의 길이가 길어지면 측정되는 태양 고도 값도 더 커진다.", answer:false,
@@ -256,8 +288,42 @@
     { stmt:"정확한 각도를 재려면 태양을 직접 눈으로 보면서 측정해야 한다.", answer:false,
       explain:"태양을 직접 보면 눈이 손상될 수 있어요. 그림자를 이용해 안전하게 측정합니다." }
   ];
-  // ▲▲▲ 여기까지 문제 내용 ▲▲▲
+  // ▲▲▲ 여기까지 기본 문제 내용 ▲▲▲
 
+  function loadSavedQuestions(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : null;
+      if(Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }catch(e){}
+    return null;
+  }
+
+  function questionsToText(qs){
+    return qs.map(q => [q.stmt, q.answer ? 'O' : 'X', q.explain || ''].join(' | ')).join('\n');
+  }
+
+  function parseQuestionsText(text){
+    const lines = text.split('\n').map(l=>l.trim()).filter(l=>l.length>0 && !l.startsWith('#'));
+    const out = [];
+    const errors = [];
+    lines.forEach((line, i)=>{
+      const cells = line.includes('\t') ? line.split('\t') : line.split('|');
+      const stmt = (cells[0]||'').trim();
+      const ansRaw = (cells[1]||'').trim().toUpperCase();
+      const explain = (cells[2]||'').trim();
+      const isO = ansRaw === 'O' || ansRaw === 'TRUE' || ansRaw === '참';
+      const isX = ansRaw === 'X' || ansRaw === 'FALSE' || ansRaw === '거짓';
+      if(!stmt || !(isO || isX)){
+        errors.push((i+1) + '번째 줄 형식을 확인해주세요 → ' + line);
+        return;
+      }
+      out.push({ stmt, answer:isO, explain: explain || (isO ? '정답은 O예요.' : '정답은 X예요.') });
+    });
+    return { out, errors };
+  }
+
+  let QUESTIONS = loadSavedQuestions() || DEFAULT_QUESTIONS.slice();
   let order = QUESTIONS.map((_,i)=>i);
   let idx = 0;
   let timerHandle = null;
@@ -286,6 +352,14 @@
   const restartBtn = document.getElementById('restartBtn');
   const themeBtn = document.getElementById('themeBtn');
   const fsBtn = document.getElementById('fsBtn');
+
+  const qeditToggleBtn = document.getElementById('qeditToggleBtn');
+  const qeditPanel = document.getElementById('qeditPanel');
+  const qeditArea = document.getElementById('qeditArea');
+  const qeditStatus = document.getElementById('qeditStatus');
+  const qeditSaveBtn = document.getElementById('qeditSaveBtn');
+  const qeditResetBtn = document.getElementById('qeditResetBtn');
+  const qeditFile = document.getElementById('qeditFile');
 
   function shuffle(arr){
     const a = arr.slice();
@@ -434,6 +508,56 @@
     if(cur === 'dark'){ root.setAttribute('data-theme','light'); }
     else if(cur === 'light'){ root.removeAttribute('data-theme'); }
     else { root.setAttribute('data-theme','dark'); }
+  });
+
+  qeditToggleBtn.addEventListener('click', ()=>{
+    const opening = qeditPanel.style.display === 'none';
+    qeditPanel.style.display = opening ? '' : 'none';
+    if(opening){
+      qeditArea.value = questionsToText(QUESTIONS);
+      qeditStatus.textContent = '';
+      qeditStatus.classList.remove('err');
+    }
+  });
+
+  qeditSaveBtn.addEventListener('click', ()=>{
+    const { out, errors } = parseQuestionsText(qeditArea.value);
+    if(errors.length){
+      qeditStatus.classList.add('err');
+      qeditStatus.textContent = errors.join('\n');
+      return;
+    }
+    if(out.length === 0){
+      qeditStatus.classList.add('err');
+      qeditStatus.textContent = '문제를 1개 이상 입력해주세요.';
+      return;
+    }
+    QUESTIONS = out;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(out));
+    qeditStatus.classList.remove('err');
+    qeditStatus.textContent = out.length + '문항 저장 완료! "게임 시작"을 누르면 이 문제로 진행돼요.';
+  });
+
+  qeditResetBtn.addEventListener('click', ()=>{
+    localStorage.removeItem(STORAGE_KEY);
+    QUESTIONS = DEFAULT_QUESTIONS.slice();
+    qeditArea.value = questionsToText(QUESTIONS);
+    qeditStatus.classList.remove('err');
+    qeditStatus.textContent = '기본 문제(1차시)로 초기화했어요.';
+  });
+
+  qeditFile.addEventListener('change', ()=>{
+    const file = qeditFile.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      qeditArea.value = String(reader.result || '');
+      qeditPanel.style.display = '';
+      qeditStatus.classList.remove('err');
+      qeditStatus.textContent = '파일을 불러왔어요. 내용을 확인하고 "이 문제로 저장"을 눌러주세요.';
+    };
+    reader.readAsText(file, 'utf-8');
+    qeditFile.value = '';
   });
 })();
 </script>
