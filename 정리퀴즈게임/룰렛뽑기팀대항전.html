@@ -235,10 +235,11 @@
     <div class="qedit-toggle-row">
       <button class="iconbtn" id="qeditToggleBtn" type="button">✏️ 문제 편집(붙여넣기)</button>
       <label class="filelbl">📂 파일 불러오기<input type="file" id="qeditFile" accept=".txt,.csv" style="display:none;"></label>
+      <button class="filelbl" id="qeditExportBtn" type="button">💾 파일로 내보내기</button>
       <span class="eyebrow" style="margin-left:auto;">더블찬스=같은 모둠 재도전 · 꽝=다음 모둠 차례</span>
     </div>
     <div class="qedit-panel" id="qeditPanel" style="display:none;">
-      <p class="qedit-help">한 줄에 문제 하나씩 <b>질문 | 정답</b> 형식으로 입력하세요. 엑셀·구글시트에 표로 정리해 둔 뒤 그대로 복사해서 붙여넣어도(탭 구분) 자동으로 인식돼요. 문제 개수에 맞춰 룰렛 칸 수도 자동으로 다시 배치됩니다. 저장 내용은 이 브라우저에 남아 다음 수업 때도 유지돼요.</p>
+      <p class="qedit-help">한 줄에 문제 하나씩 <b>질문 | 정답</b> 형식으로 입력하세요. 엑셀·구글시트에 표로 정리해 둔 뒤 그대로 복사해서 붙여넣어도(탭 구분) 자동으로 인식돼요. 문제 개수에 맞춰 룰렛 칸 수도 자동으로 다시 배치됩니다. <b>파일로 내보내기</b>로 오늘 만든 문제를 .txt로 저장해 두면, 어떤 컴퓨터·브라우저에서 열어도 '파일 불러오기'로 똑같이 불러올 수 있어요.</p>
       <textarea id="qeditArea" rows="9" spellcheck="false"></textarea>
       <div class="qedit-status" id="qeditStatus"></div>
       <div class="qedit-btnrow">
@@ -379,6 +380,18 @@
   const qeditSaveBtn = document.getElementById('qeditSaveBtn');
   const qeditResetBtn = document.getElementById('qeditResetBtn');
   const qeditFile = document.getElementById('qeditFile');
+  const qeditExportBtn = document.getElementById('qeditExportBtn');
+
+  function downloadText(filename, text){
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url), 1000);
+  }
 
   function segLabel(seg){
     if(seg.type === 'double') return '2배';
@@ -574,7 +587,7 @@
     modalBackdrop.classList.add('show');
 
     showAnswerBtn.onclick = ()=>{
-      modalAtext.style.display = '';
+      modalAtext.style.display = 'block';
       showAnswerBtn.style.display = 'none';
       awardRow.style.display = 'flex';
       awardRow.innerHTML = '';
@@ -699,6 +712,19 @@
     };
     reader.readAsText(file, 'utf-8');
     qeditFile.value = '';
+  });
+
+  qeditExportBtn.addEventListener('click', ()=>{
+    const opening = qeditPanel.style.display === 'none';
+    const text = opening ? questionsToText(QUESTIONS) : qeditArea.value;
+    if(opening){
+      qeditPanel.style.display = '';
+      qeditArea.value = text;
+    }
+    const stamp = new Date().toISOString().slice(0,10);
+    downloadText('roulette-quiz-questions-' + stamp + '.txt', text);
+    qeditStatus.classList.remove('err');
+    qeditStatus.textContent = '파일로 내보냈어요. 다른 기기에서는 "파일 불러오기"로 이 파일을 열면 똑같이 이어서 쓸 수 있어요.';
   });
 
   resetGame();
