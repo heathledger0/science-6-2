@@ -100,6 +100,21 @@
   .hud .hud-title{ font-weight:800; font-size:.95rem; margin-bottom:6px; }
   .hud .hud-num{ font-family:'SFMono-Regular','Consolas',monospace; font-weight:700; }
 
+  .hint{
+    position:absolute; bottom:14px; left:50%; transform:translateX(-50%);
+    background:rgba(20,22,18,0.5); color:#f3f3ee; font-size:.76rem;
+    padding:6px 12px; border-radius:999px; pointer-events:none; white-space:nowrap;
+  }
+  .reset-btn{
+    position:absolute; top:18px; right:18px;
+    background:rgba(20,22,18,0.55); color:#f3f3ee; border:1px solid rgba(255,255,255,0.25);
+    border-radius:999px; padding:7px 14px; font-size:.78rem; font-weight:700; cursor:pointer;
+    font-family:inherit;
+  }
+  .reset-btn:hover{ background:rgba(20,22,18,0.75); }
+  #stage{ cursor:grab; touch-action:none; }
+  #stage:active{ cursor:grabbing; }
+
   .legend{ display:flex; flex-wrap:wrap; gap:14px; margin-top:10px; padding:0 2px; }
   .legend span{ display:inline-flex; align-items:center; gap:6px; font-size:.78rem; color:var(--ink-soft); }
   .swatch{ width:16px; height:3px; border-radius:2px; display:inline-block; box-shadow:0 0 0 1px var(--panel-line); }
@@ -156,6 +171,8 @@
         현재 시각: <span class="hud-num" id="hudTime">-</span><br>
         태양 고도: <span class="hud-num" id="hudAlt">-</span>
       </div>
+      <button class="reset-btn" id="resetView" type="button">보기 초기화</button>
+      <div class="hint">🖱️ 드래그해서 천구를 돌려보세요</div>
     </div>
 
     <div class="legend" id="legend">
@@ -286,27 +303,37 @@
   const worldScale = 165;
   const centerX = W * 0.5;
   const centerY = H * 0.58;
-  const tiltTheta = deg2rad(27); // 카메라가 내려다보는 각도
+  const DEFAULT_TILT = deg2rad(27);
+  let cameraYaw = 0;          // 드래그로 좌우 회전
+  let cameraTilt = DEFAULT_TILT; // 드래그로 위아래(내려다보는 각도) 조절
+
+  // 카메라를 마우스/터치 드래그로 자유롭게 회전시킬 수 있도록, 방위(요) 회전을 먼저 적용
+  function rotateYaw(p, yaw){
+    const c = Math.cos(yaw), s = Math.sin(yaw);
+    return { x: p.x*c + p.z*s, y: p.y, z: -p.x*s + p.z*c };
+  }
 
   function project(p){
-    // 카메라가 남쪽을 바라보며 아래로 기울어져 있다고 가정: 고도(Y)가 높을수록,
-    // 남쪽(Z+)일수록 화면에서 더 위로 올라가야 함 (둘 다 음수 기여 = 위로).
-    const yp = -(p.y*Math.cos(tiltTheta) + p.z*Math.sin(tiltTheta));
-    const zp = p.z*Math.cos(tiltTheta) - p.y*Math.sin(tiltTheta);
-    // 카메라가 남쪽을 바라본다고 가정하면(남=화면 안쪽), 관찰자 기준 동쪽은 화면 왼쪽에 옵니다.
+    const r = rotateYaw(p, cameraYaw);
+    // 카메라가 아래로 기울어져 있다고 가정: 고도(Y)가 높을수록, 카메라가 바라보는 먼 쪽(Z')일수록
+    // 화면에서 더 위로 올라가야 함 (둘 다 음수 기여 = 위로).
+    const yp = -(r.y*Math.cos(cameraTilt) + r.z*Math.sin(cameraTilt));
+    const zp = r.z*Math.cos(cameraTilt) - r.y*Math.sin(cameraTilt);
+    // 기본 방위(요=0)에서 카메라가 남쪽을 바라본다고 가정하면, 관찰자 기준 동쪽은 화면 왼쪽에 옵니다.
     // 그래서 월드 X(동+)를 화면에 그대로 쓰면 좌우가 뒤바뀌므로 부호를 반전합니다.
-    return { sx: centerX - p.x*worldScale, sy: centerY + yp*worldScale, depth: zp };
+    return { sx: centerX - r.x*worldScale, sy: centerY + yp*worldScale, depth: zp };
   }
   function projectAltAz(altDeg, azDeg, radius){ return project(sphericalToXYZ(altDeg, azDeg, radius)); }
 
   const R_GROUND = 1.0;
   const R_ARC = 1.18; // 태양 궤적을 그리는 반구 반지름
 
-  // 땅(원판)은 Y=0 평면의 원이므로 항상 정확한 타원으로 그릴 수 있음
+  // 땅(원판)은 Y=0 평면의 원이므로, 카메라를 좌우로 돌려도(요 회전) 항상 같은 크기의
+  // 타원으로 보입니다(원을 수직축으로 돌려도 여전히 원이므로). 위아래 기울기만 타원의 세로 반지름에 영향을 줍니다.
   function groundEllipse(radius){
     return {
       rh: radius * worldScale,
-      rv: radius * worldScale * Math.sin(tiltTheta)
+      rv: radius * worldScale * Math.sin(cameraTilt)
     };
   }
 
@@ -317,6 +344,16 @@
   }
   function rgbStr(c){ return `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`; }
   function lerpRgb(c1,c2,t){ return [lerp(c1[0],c2[0],t),lerp(c1[1],c2[1],t),lerp(c1[2],c2[2],t)]; }
+  function shadeHex(hex, amt){
+    const [r,g,b] = hexToRgb(hex);
+    const f = c => clamp(c+amt, 0, 255);
+    return rgbStr([f(r),f(g),f(b)]);
+  }
+  // 태양 고도가 낮을수록(일출·일몰) 주황빛으로, 높을수록 밝은 노란빛으로 색온도를 바꿈
+  function sunColor(alt){
+    const t = clamp(alt/45, 0, 1);
+    return rgbStr(lerpRgb(hexToRgb('#ff7a3d'), hexToRgb('#fff2b8'), t));
+  }
   const NIGHT = { top:hexToRgb('#0c1128'), bottom:hexToRgb('#1c2444') };
   const DUSK  = { top:hexToRgb('#5b6ea8'), bottom:hexToRgb('#f2a774') };
   const DAY   = { top:hexToRgb('#bfe3ff'), bottom:hexToRgb('#eaf7ff') };
@@ -358,17 +395,27 @@
   }
 
   function drawTree(baseX, baseZ, height, canopyColor, sunAlt, sunAz){
-    // 그림자(태양이 지평선 위에 있을 때만)
+    const pBase = project({x:baseX,y:0,z:baseZ});
+
+    // 접지 그림자(항상 옅게 깔려, 나무가 땅에 붙어 있다는 입체감을 줌)
+    ctx.fillStyle = 'rgba(20,30,15,0.2)';
+    ctx.beginPath();
+    ctx.ellipse(pBase.sx, pBase.sy+2, 15, 5.5, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // 방향성 그림자(태양이 지평선 위에 있을 때만, 태양 반대 방향으로)
     if(sunAlt > 0.5){
       const shadowLen = Math.min(height / Math.tan(deg2rad(Math.max(sunAlt,4))), height*7);
       const azR = deg2rad(sunAz);
-      const dirX = Math.sin(azR), dirZ = -Math.cos(azR); // 태양 반대 방향(그림자 방향)
+      const dirX = Math.sin(azR), dirZ = -Math.cos(azR);
       const tipX = baseX + dirX*shadowLen, tipZ = baseZ + dirZ*shadowLen;
-      const pBase = project({x:baseX,y:0,z:baseZ});
       const pTip = project({x:tipX,y:0,z:tipZ});
-      const shadowAlpha = clamp(0.38 - sunAlt/220, 0.12, 0.38);
-      ctx.strokeStyle = `rgba(25,25,20,${shadowAlpha})`;
-      ctx.lineWidth = 10;
+      const shadowAlpha = clamp(0.36 - sunAlt/220, 0.12, 0.36);
+      const shGrad = ctx.createLinearGradient(pBase.sx,pBase.sy,pTip.sx,pTip.sy);
+      shGrad.addColorStop(0, `rgba(20,22,16,${shadowAlpha})`);
+      shGrad.addColorStop(1, `rgba(20,22,16,0)`);
+      ctx.strokeStyle = shGrad;
+      ctx.lineWidth = 9;
       ctx.lineCap = 'round';
       ctx.beginPath();
       ctx.moveTo(pBase.sx,pBase.sy);
@@ -376,21 +423,32 @@
       ctx.stroke();
       ctx.lineCap = 'butt';
     }
-    // 나무
-    const pBase = project({x:baseX,y:0,z:baseZ});
+
+    // 나무 기둥(살짝 밝은 하이라이트 줄무늬로 원통감)
     const pTop = project({x:baseX,y:height,z:baseZ});
-    ctx.strokeStyle = '#6d4c2f';
-    ctx.lineWidth = 6;
+    ctx.strokeStyle = '#5a3f26';
+    ctx.lineWidth = 7;
     ctx.lineCap = 'round';
     ctx.beginPath();
     ctx.moveTo(pBase.sx,pBase.sy);
     ctx.lineTo(pTop.sx,pTop.sy);
     ctx.stroke();
-    ctx.lineCap = 'butt';
-    ctx.fillStyle = canopyColor;
+    ctx.strokeStyle = '#8a6239';
+    ctx.lineWidth = 2.5;
     ctx.beginPath();
-    ctx.arc(pTop.sx, pTop.sy-10, 17, 0, Math.PI*2);
-    ctx.fill();
+    ctx.moveTo(pBase.sx-1.5,pBase.sy);
+    ctx.lineTo(pTop.sx-1.5,pTop.sy);
+    ctx.stroke();
+    ctx.lineCap = 'butt';
+
+    // 잎(세 겹 원을 겹쳐 그려 입체감 있는 수관 표현)
+    const cx = pTop.sx, cy = pTop.sy - 9;
+    ctx.fillStyle = shadeHex(canopyColor, -30);
+    ctx.beginPath(); ctx.arc(cx+4, cy+3, 15, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = canopyColor;
+    ctx.beginPath(); ctx.arc(cx-2, cy-3, 15, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = shadeHex(canopyColor, 35);
+    ctx.beginPath(); ctx.arc(cx-6, cy-9, 7.5, 0, Math.PI*2); ctx.fill();
   }
 
   function drawScene(){
@@ -447,10 +505,17 @@
     ctx.ellipse(centerX, centerY, hEll.rh, hEll.rv, 0, 0, Math.PI*2);
     ctx.stroke();
 
+    // ---- 천구 돔의 뼈대(고도 30°·60° 등고선)로 하늘이 반구라는 느낌을 강조 ----
+    [30,60].forEach(a=>{
+      const ringPts = [];
+      for(let az=-180; az<=180; az+=6) ringPts.push({ altDeg:a, azFromSouthDeg:az });
+      strokeSkyPath(ringPts, R_ARC, 'rgba(255,255,255,0.16)', 1, [2,5]);
+    });
+
     // ---- 천구의 적도(적위 0, 춘분/추분 궤적) ----
     if(showEq){
       const eqPts = pathAltAz(0, 90, 72);
-      strokeSkyPath(eqPts, R_ARC, 'rgba(150,158,180,0.75)', 1.6, [5,5]);
+      strokeSkyPath(eqPts, R_ARC, 'rgba(150,158,180,0.85)', 1.8, [5,5]);
     }
 
     // ---- 사계절 비교 궤적(옅게) ----
@@ -484,17 +549,41 @@
     ctx.fillText('남중 ' + peak.altDeg.toFixed(1) + '°', pPeak.sx, pPeak.sy - 12);
     ctx.textAlign = 'left';
 
-    // ---- 땅(원판: 잔디) ----
-    const gEll = groundEllipse(R_GROUND);
-    const groundGrad = ctx.createLinearGradient(0, centerY-gEll.rv, 0, centerY+gEll.rv);
-    groundGrad.addColorStop(0, '#8fc97a');
-    groundGrad.addColorStop(1, '#4f8a44');
+    // ---- 땅(원판: 흙 테두리 + 잔디) ----
+    const dirtEll = groundEllipse(R_GROUND);
+    ctx.fillStyle = '#8a6b45';
+    ctx.beginPath();
+    ctx.ellipse(centerX, centerY, dirtEll.rh, dirtEll.rv, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    const gEll = groundEllipse(R_GROUND*0.94);
+    const groundGrad = ctx.createRadialGradient(centerX, centerY-gEll.rv*0.35, gEll.rh*0.08, centerX, centerY, gEll.rh*1.05);
+    groundGrad.addColorStop(0, '#a9df8c');
+    groundGrad.addColorStop(0.6, '#79b862');
+    groundGrad.addColorStop(1, '#4c8641');
     ctx.fillStyle = groundGrad;
     ctx.beginPath();
     ctx.ellipse(centerX, centerY, gEll.rh, gEll.rv, 0, 0, Math.PI*2);
     ctx.fill();
+
+    // 잔디 질감: 원판 안에 고정된 위치의 짧은 풀잎을 흩뿌려 표현(3D 투영을 그대로 사용)
+    for(let i=0;i<150;i++){
+      const ang = pseudoRandom(i*3.11) * Math.PI * 2;
+      const rad = Math.sqrt(pseudoRandom(i*7.53)) * R_GROUND * 0.9;
+      const bx = Math.cos(ang)*rad, bz = Math.sin(ang)*rad;
+      const bladeH = 0.035 + pseudoRandom(i*2.21)*0.02;
+      const pb = project({x:bx,y:0,z:bz});
+      const pt = project({x:bx + (pseudoRandom(i*6.4)-0.5)*0.03, y:bladeH, z:bz});
+      ctx.strokeStyle = pseudoRandom(i*9.44) > 0.5 ? 'rgba(55,105,46,0.55)' : 'rgba(175,225,140,0.5)';
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      ctx.moveTo(pb.sx,pb.sy);
+      ctx.lineTo(pt.sx,pt.sy);
+      ctx.stroke();
+    }
+
     // 방위 안내용 옅은 격자(동서/남북 축 + 동심원)
-    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.22)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.ellipse(centerX, centerY, gEll.rh*0.66, gEll.rv*0.66, 0, 0, Math.PI*2);
@@ -503,7 +592,7 @@
     ctx.ellipse(centerX, centerY, gEll.rh*0.33, gEll.rv*0.33, 0, 0, Math.PI*2);
     ctx.stroke();
     [0,90,180,270].forEach(azDeg=>{
-      const edge = project(sphericalToXYZ(0, azDeg-180, R_GROUND));
+      const edge = project(sphericalToXYZ(0, azDeg-180, R_GROUND*0.94));
       ctx.beginPath();
       ctx.moveTo(centerX, centerY);
       ctx.lineTo(edge.sx, edge.sy);
@@ -546,20 +635,34 @@
     ctx.shadowBlur = 0;
 
     // ---- 태양(현재 시각 위치) ----
+    // 고도가 낮을수록(일출·일몰) 주황빛, 높을수록 밝은 노란빛으로 색이 바뀌어 더 사실적으로 보임
     if(cur.altDeg > -10){
       const pSun = projectAltAz(Math.max(cur.altDeg,-10), cur.azFromSouthDeg, R_ARC);
       const sunAlpha = clamp((cur.altDeg+10)/10, 0.15, 1);
+      const core = sunColor(cur.altDeg);
       ctx.globalAlpha = sunAlpha;
-      const glow = ctx.createRadialGradient(pSun.sx,pSun.sy,2,pSun.sx,pSun.sy,26);
-      glow.addColorStop(0,'rgba(255,220,140,0.9)');
-      glow.addColorStop(1,'rgba(255,220,140,0)');
+      const outerGlow = ctx.createRadialGradient(pSun.sx,pSun.sy,4,pSun.sx,pSun.sy,42);
+      outerGlow.addColorStop(0, core.replace('rgb','rgba').replace(')',',0.45)'));
+      outerGlow.addColorStop(1, core.replace('rgb','rgba').replace(')',',0)'));
+      ctx.fillStyle = outerGlow;
+      ctx.beginPath();
+      ctx.arc(pSun.sx,pSun.sy,42,0,Math.PI*2);
+      ctx.fill();
+      const glow = ctx.createRadialGradient(pSun.sx,pSun.sy,2,pSun.sx,pSun.sy,24);
+      glow.addColorStop(0, core.replace('rgb','rgba').replace(')',',0.95)'));
+      glow.addColorStop(1, core.replace('rgb','rgba').replace(')',',0)'));
       ctx.fillStyle = glow;
       ctx.beginPath();
-      ctx.arc(pSun.sx,pSun.sy,26,0,Math.PI*2);
+      ctx.arc(pSun.sx,pSun.sy,24,0,Math.PI*2);
       ctx.fill();
-      ctx.fillStyle = '#ffcf4d';
+      ctx.fillStyle = '#fff7dd';
       ctx.beginPath();
-      ctx.arc(pSun.sx,pSun.sy,12,0,Math.PI*2);
+      ctx.arc(pSun.sx,pSun.sy,11,0,Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle = core;
+      ctx.globalAlpha = sunAlpha*0.55;
+      ctx.beginPath();
+      ctx.arc(pSun.sx,pSun.sy,11,0,Math.PI*2);
       ctx.fill();
       ctx.globalAlpha = 1;
     }
@@ -599,6 +702,30 @@
   ['monthSlider','hourSlider','compareMode','showEquator'].forEach(id=>{
     document.getElementById(id).addEventListener('input', drawScene);
     document.getElementById(id).addEventListener('change', drawScene);
+  });
+
+  // ---- 드래그로 천구 회전(마우스·터치 모두 지원) ----
+  let dragging = false, lastPX = 0, lastPY = 0;
+  canvas.addEventListener('pointerdown', (e)=>{
+    dragging = true;
+    lastPX = e.clientX; lastPY = e.clientY;
+    canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener('pointermove', (e)=>{
+    if(!dragging) return;
+    const dx = e.clientX - lastPX, dy = e.clientY - lastPY;
+    lastPX = e.clientX; lastPY = e.clientY;
+    cameraYaw += dx * 0.008;
+    cameraTilt = clamp(cameraTilt - dy*0.006, deg2rad(10), deg2rad(80));
+    drawScene();
+  });
+  ['pointerup','pointercancel','pointerleave'].forEach(evt=>{
+    canvas.addEventListener(evt, ()=>{ dragging = false; });
+  });
+  document.getElementById('resetView').addEventListener('click', ()=>{
+    cameraYaw = 0;
+    cameraTilt = DEFAULT_TILT;
+    drawScene();
   });
 
   drawScene();
