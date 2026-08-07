@@ -359,8 +359,14 @@
   const canvas = document.getElementById('stage');
   const ctx = canvas.getContext('2d');
   const W = canvas.width, H = canvas.height;
-  const groundY = H * 0.72;
+  const groundY = H * 0.82; // 땅의 높이(비율). 값을 키우면 땅이 더 낮아지고 하늘이 넓어집니다.
   const pxPerCm = 6; // 화면상 1cm를 몇 픽셀로 그릴지 (표현용 스케일)
+
+  // 시드 기반 의사난수: 매번 다시 그려도(슬라이더 조작 시) 잔디 위치가 흔들리지 않도록 고정된 값을 만듭니다.
+  function pseudoRandom(seed){
+    const x = Math.sin(seed * 12.9898) * 43758.5453;
+    return x - Math.floor(x);
+  }
 
   const elevSlider = document.getElementById('elevSlider');
   const stickSlider = document.getElementById('stickSlider');
@@ -393,14 +399,34 @@
     ctx.clearRect(0,0,W,H);
 
     // 하늘은 canvas 자체 CSS 배경(고정 주간 하늘)을 사용하고, 여기서는 태양/땅/막대기만 그림
-    // 땅
-    ctx.fillStyle = '#8fc97a';
+    // 땅: 위(지평선)는 밝고 아래로 갈수록 짙어지는 그라데이션 + 잔디 질감으로 좀 더 사실적으로 표현
+    const groundGrad = ctx.createLinearGradient(0, groundY, 0, H);
+    groundGrad.addColorStop(0, '#9ed486');
+    groundGrad.addColorStop(1, '#5c9b4e');
+    ctx.fillStyle = groundGrad;
     ctx.fillRect(0, groundY, W, H - groundY);
-    ctx.strokeStyle = '#5a9c46';
-    ctx.beginPath();
-    ctx.moveTo(0, groundY);
-    ctx.lineTo(W, groundY);
-    ctx.stroke();
+
+    // 지평선이 하늘과 자연스럽게 이어지도록 옅은 그림자 띠를 추가(딱딱한 경계선 대신)
+    const horizonGrad = ctx.createLinearGradient(0, groundY, 0, groundY + 16);
+    horizonGrad.addColorStop(0, 'rgba(50,80,40,0.28)');
+    horizonGrad.addColorStop(1, 'rgba(50,80,40,0)');
+    ctx.fillStyle = horizonGrad;
+    ctx.fillRect(0, groundY, W, 16);
+
+    // 잔디 질감: 위치가 고정된 짧은 풀잎 획들을 흩뿌려 잔디밭처럼 보이게 함
+    for(let i=0;i<170;i++){
+      const gx = pseudoRandom(i*3.17) * W;
+      const gy = groundY + 5 + pseudoRandom(i*7.71) * (H - groundY - 12);
+      const lean = (pseudoRandom(i*5.31) - 0.5) * 6;
+      const blade = 4 + pseudoRandom(i*2.23) * 6;
+      const shade = pseudoRandom(i*9.93);
+      ctx.strokeStyle = shade > 0.5 ? 'rgba(70,120,58,0.45)' : 'rgba(150,205,125,0.4)';
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      ctx.moveTo(gx, gy);
+      ctx.lineTo(gx + lean, gy - blade);
+      ctx.stroke();
+    }
 
     // 태양 광선의 기준점 계산 (막대기 기준점에서 왼쪽 위 방향으로, 태양 고도 각도만큼)
     // 태양 그림은 그리지 않고, 빛이 들어오는 방향(화살표)만 보여줍니다.
@@ -460,21 +486,42 @@
       // 태양이 왼쪽 하늘에 있으므로 그림자는 태양 반대편인 오른쪽 방향으로 생김
       const shadowX = x + shadowPx;
 
-      // 막대기
-      ctx.strokeStyle = '#6d4c2f';
-      ctx.lineWidth = 6;
-      ctx.beginPath();
-      ctx.moveTo(x, groundY);
-      ctx.lineTo(topX, topY);
-      ctx.stroke();
-
-      // 그림자
-      ctx.strokeStyle = '#333';
-      ctx.lineWidth = 4;
+      // 그림자: 막대 쪽은 짙고 끝으로 갈수록 옅어지는 그라데이션 + 살짝 블러를 줘서
+      // 자로 그은 듯한 선이 아니라 실제로 바닥에 드리운 그림자처럼 보이게 함
+      const shadowGrad = ctx.createLinearGradient(x, groundY, shadowX, groundY);
+      shadowGrad.addColorStop(0, 'rgba(25,25,20,0.5)');
+      shadowGrad.addColorStop(1, 'rgba(25,25,20,0.06)');
+      ctx.save();
+      ctx.filter = 'blur(1.4px)';
+      ctx.strokeStyle = shadowGrad;
+      ctx.lineWidth = 5;
+      ctx.lineCap = 'round';
       ctx.beginPath();
       ctx.moveTo(x, groundY);
       ctx.lineTo(shadowX, groundY);
       ctx.stroke();
+      ctx.restore();
+
+      // 막대기: 원통형 나무 막대처럼 보이도록 가운데는 밝고 양쪽 가장자리는 어두운
+      // 그라데이션을 주고, 바닥에 닿는 부분에는 작은 접지 그림자(타원)를 추가
+      ctx.fillStyle = 'rgba(20,18,10,0.28)';
+      ctx.beginPath();
+      ctx.ellipse(x, groundY + 1, 7, 2.6, 0, 0, Math.PI*2);
+      ctx.fill();
+
+      const stickGrad = ctx.createLinearGradient(x - 4, 0, x + 4, 0);
+      stickGrad.addColorStop(0, '#4a3320');
+      stickGrad.addColorStop(0.45, '#9a7043');
+      stickGrad.addColorStop(0.55, '#9a7043');
+      stickGrad.addColorStop(1, '#4a3320');
+      ctx.strokeStyle = stickGrad;
+      ctx.lineWidth = 7;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(x, groundY);
+      ctx.lineTo(topX, topY);
+      ctx.stroke();
+      ctx.lineCap = 'butt';
 
       // 실(막대 끝 ~ 그림자 끝) : 태양 고도 측정기의 '실' 역할
       ctx.strokeStyle = '#2a6fdb';
