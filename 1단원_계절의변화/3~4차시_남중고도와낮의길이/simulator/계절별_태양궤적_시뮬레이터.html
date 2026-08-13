@@ -238,6 +238,19 @@
   function rad2deg(r){ return r * 180 / Math.PI; }
   function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
   function lerp(a,b,t){ return a + (b-a)*t; }
+  // 그림자·물체가 땅(원판) 가장자리를 벗어나 허공에 붕 떠 보이지 않도록,
+  // (baseX,baseZ)에서 (dirX,dirZ) 방향으로 desiredLen만큼 뻗어나가는 그림자를
+  // 반지름 maxRadius인 땅의 경계에서 잘라내는 길이를 구함
+  function clipRayToDisc(baseX, baseZ, dirX, dirZ, desiredLen, maxRadius){
+    const a = 1; // dir은 단위벡터라고 가정
+    const b = 2*(baseX*dirX + baseZ*dirZ);
+    const c = baseX*baseX + baseZ*baseZ - maxRadius*maxRadius;
+    const disc = b*b - 4*a*c;
+    if(disc < 0) return 0;
+    const t = (-b + Math.sqrt(disc)) / (2*a);
+    if(t <= 0) return 0;
+    return Math.min(desiredLen, t);
+  }
 
   // ---------- 천문 계산 ----------
   const CUM_DAYS = [0,31,59,90,120,151,181,212,243,273,304,334];
@@ -412,24 +425,29 @@
     ctx.fill();
 
     // 방향성 그림자(태양이 지평선 위에 있을 때만, 태양 반대 방향으로)
-    if(sunAlt > 0.5){
-      const shadowLen = Math.min(height / Math.tan(deg2rad(Math.max(sunAlt,4))), height*7);
+    // 해가 뜨거나 질 무렵(고도가 낮을 때)에는 수학적으로 그림자가 무한히 길어지므로,
+    // 땅(원판) 가장자리에서 잘라내어 허공으로 삐져나가지 않고 실제 땅 위에만 드리우게 함
+    if(sunAlt > 0.3){
+      const rawLen = height / Math.tan(deg2rad(Math.max(sunAlt,0.3)));
       const azR = deg2rad(sunAz);
       const dirX = Math.sin(azR), dirZ = -Math.cos(azR);
-      const tipX = baseX + dirX*shadowLen, tipZ = baseZ + dirZ*shadowLen;
-      const pTip = project({x:tipX,y:0,z:tipZ});
-      const shadowAlpha = clamp(0.36 - sunAlt/220, 0.12, 0.36);
-      const shGrad = ctx.createLinearGradient(pBase.sx,pBase.sy,pTip.sx,pTip.sy);
-      shGrad.addColorStop(0, `rgba(20,22,16,${shadowAlpha})`);
-      shGrad.addColorStop(1, `rgba(20,22,16,0)`);
-      ctx.strokeStyle = shGrad;
-      ctx.lineWidth = 9;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(pBase.sx,pBase.sy);
-      ctx.lineTo(pTip.sx,pTip.sy);
-      ctx.stroke();
-      ctx.lineCap = 'butt';
+      const shadowLen = clipRayToDisc(baseX, baseZ, dirX, dirZ, rawLen, R_GROUND*0.97);
+      if(shadowLen > 0.015){
+        const tipX = baseX + dirX*shadowLen, tipZ = baseZ + dirZ*shadowLen;
+        const pTip = project({x:tipX,y:0,z:tipZ});
+        const shadowAlpha = clamp(0.36 - sunAlt/220, 0.12, 0.36);
+        const shGrad = ctx.createLinearGradient(pBase.sx,pBase.sy,pTip.sx,pTip.sy);
+        shGrad.addColorStop(0, `rgba(20,22,16,${shadowAlpha})`);
+        shGrad.addColorStop(1, `rgba(20,22,16,0)`);
+        ctx.strokeStyle = shGrad;
+        ctx.lineWidth = 9;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(pBase.sx,pBase.sy);
+        ctx.lineTo(pTip.sx,pTip.sy);
+        ctx.stroke();
+        ctx.lineCap = 'butt';
+      }
     }
 
     // 나무 기둥(살짝 밝은 하이라이트 줄무늬로 원통감)
@@ -481,6 +499,130 @@
         ctx.beginPath(); ctx.arc(lp.sx, lp.sy, 3, 0, Math.PI*2); ctx.fill();
       });
     }
+  }
+
+  // 사각형 면 위의 한 점을 구하는 이중선형 보간(bl=아래왼쪽, br=아래오른쪽, tl=위왼쪽, tr=위오른쪽)
+  function lerpQuad(bl, br, tl, tr, u, v){
+    const bx = lerp(bl.x,br.x,u), by = lerp(bl.y,br.y,u), bz = lerp(bl.z,br.z,u);
+    const tx = lerp(tl.x,tr.x,u), ty = lerp(tl.y,tr.y,u), tz = lerp(tl.z,tr.z,u);
+    return { x: lerp(bx,tx,v), y: lerp(by,ty,v), z: lerp(bz,tz,v) };
+  }
+
+  function drawWindow(bl, br, tl, tr, u0, u1, v0, v1, isNight){
+    const p00 = project(lerpQuad(bl,br,tl,tr,u0,v0));
+    const p10 = project(lerpQuad(bl,br,tl,tr,u1,v0));
+    const p11 = project(lerpQuad(bl,br,tl,tr,u1,v1));
+    const p01 = project(lerpQuad(bl,br,tl,tr,u0,v1));
+    if(isNight){
+      const cx = (p00.sx+p11.sx)/2, cy = (p00.sy+p11.sy)/2;
+      const glow = ctx.createRadialGradient(cx,cy,1,cx,cy,17);
+      glow.addColorStop(0,'rgba(255,214,120,0.85)');
+      glow.addColorStop(1,'rgba(255,214,120,0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath(); ctx.arc(cx,cy,17,0,Math.PI*2); ctx.fill();
+    }
+    ctx.fillStyle = isNight ? '#ffe6a0' : '#33465a';
+    ctx.beginPath();
+    ctx.moveTo(p00.sx,p00.sy); ctx.lineTo(p10.sx,p10.sy); ctx.lineTo(p11.sx,p11.sy); ctx.lineTo(p01.sx,p01.sy);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(60,42,24,0.55)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    // 창틀 십자
+    ctx.beginPath();
+    ctx.moveTo((p00.sx+p01.sx)/2,(p00.sy+p01.sy)/2); ctx.lineTo((p10.sx+p11.sx)/2,(p10.sy+p11.sy)/2);
+    ctx.moveTo((p00.sx+p10.sx)/2,(p00.sy+p10.sy)/2); ctx.lineTo((p01.sx+p11.sx)/2,(p01.sy+p11.sy)/2);
+    ctx.stroke();
+  }
+
+  // 땅 위의 작은 집: 상자(벽 4면) + 박공지붕을 3D로 그리고, 화면상 깊이 순서(화가 알고리즘)로
+  // 렌더링해 어느 각도로 돌려 봐도(드래그해도) 자연스럽게 보이도록 함. 해가 지면 창문에 불이 켜짐.
+  function drawHouse(hx, hz, sunAlt, sunAz){
+    const hw=0.09, hd=0.075, wallH=0.11, roofH=0.075;
+    const isNight = sunAlt <= 0;
+
+    // 접지 그림자
+    const pCenter = project({x:hx,y:0,z:hz});
+    ctx.fillStyle = 'rgba(20,30,15,0.22)';
+    ctx.beginPath();
+    ctx.ellipse(pCenter.sx, pCenter.sy+2, 20, 8, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // 방향성 그림자(땅 가장자리에서 잘라냄)
+    if(sunAlt > 0.3){
+      const avgH = wallH + roofH*0.45;
+      const rawLen = avgH / Math.tan(deg2rad(Math.max(sunAlt,0.3)));
+      const azR = deg2rad(sunAz);
+      const dirX = Math.sin(azR), dirZ = -Math.cos(azR);
+      const shadowLen = clipRayToDisc(hx, hz, dirX, dirZ, rawLen, R_GROUND*0.97);
+      if(shadowLen > 0.02){
+        const tip = project({x:hx+dirX*shadowLen, y:0, z:hz+dirZ*shadowLen});
+        const shadowAlpha = clamp(0.36 - sunAlt/220, 0.12, 0.36);
+        const shGrad = ctx.createLinearGradient(pCenter.sx,pCenter.sy,tip.sx,tip.sy);
+        shGrad.addColorStop(0, `rgba(20,22,16,${shadowAlpha})`);
+        shGrad.addColorStop(1, 'rgba(20,22,16,0)');
+        ctx.strokeStyle = shGrad;
+        ctx.lineWidth = 16;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(pCenter.sx,pCenter.sy);
+        ctx.lineTo(tip.sx,tip.sy);
+        ctx.stroke();
+        ctx.lineCap = 'butt';
+      }
+    }
+
+    const b0={x:hx-hw,y:0,z:hz-hd}, b1={x:hx+hw,y:0,z:hz-hd}, b2={x:hx+hw,y:0,z:hz+hd}, b3={x:hx-hw,y:0,z:hz+hd};
+    const t0={x:hx-hw,y:wallH,z:hz-hd}, t1={x:hx+hw,y:wallH,z:hz-hd}, t2={x:hx+hw,y:wallH,z:hz+hd}, t3={x:hx-hw,y:wallH,z:hz+hd};
+    const rA={x:hx,y:wallH+roofH,z:hz-hd}, rB={x:hx,y:wallH+roofH,z:hz+hd};
+
+    const faces = [
+      { pts:[b3,b2,t2,t3], color:'#ecdebd', shade:6 },   // 남쪽(정면) 벽
+      { pts:[b0,b1,t1,t0], color:'#d7c6a1', shade:-16 }, // 북쪽(뒷면) 벽
+      { pts:[b3,b0,t0,t3], color:'#dccba5', shade:-8 },  // 서쪽 벽
+      { pts:[b1,b2,t2,t1], color:'#e3d3ad', shade:2 },   // 동쪽 벽
+      { pts:[t0,t1,rA],    color:'#b9402f', shade:-10 }, // 북쪽 박공(삼각형)
+      { pts:[t3,t2,rB],    color:'#c9503c', shade:6 },   // 남쪽 박공(삼각형)
+      { pts:[t0,t3,rB,rA], color:'#c14a34', shade:-14 }, // 서쪽 지붕면
+      { pts:[t1,t2,rB,rA], color:'#d75d42', shade:10 }   // 동쪽 지붕면
+    ];
+
+    const projected = faces.map(f=>{
+      const pts = f.pts.map(p=>project(p));
+      const depth = pts.reduce((s,p)=>s+p.depth,0)/pts.length;
+      return { pts, color:f.color, shade:f.shade, depth };
+    });
+    projected.sort((a,b)=> b.depth - a.depth);
+    projected.forEach(f=>{
+      ctx.fillStyle = shadeHex(f.color, f.shade);
+      ctx.beginPath();
+      f.pts.forEach((p,i)=>{ if(i===0) ctx.moveTo(p.sx,p.sy); else ctx.lineTo(p.sx,p.sy); });
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(50,35,20,0.18)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    });
+
+    // 문(남쪽 벽 가운데)
+    const doorP = [b3,b2,t3,t2].map(p=>project(p));
+    const doorDepth = doorP.reduce((s,p)=>s+p.depth,0)/4;
+    // 문은 남쪽 벽이 카메라 쪽을 볼 때만 그 위에 자연스럽게 얹힘(항상 그려도 무방 — 벽과 같은 면이므로)
+    const d00 = project(lerpQuad(b3,b2,t3,t2, 0.5-0.13, 0));
+    const d10 = project(lerpQuad(b3,b2,t3,t2, 0.5+0.13, 0));
+    const d11 = project(lerpQuad(b3,b2,t3,t2, 0.5+0.13, 0.6));
+    const d01 = project(lerpQuad(b3,b2,t3,t2, 0.5-0.13, 0.6));
+    ctx.fillStyle = '#6b4425';
+    ctx.beginPath();
+    ctx.moveTo(d00.sx,d00.sy); ctx.lineTo(d10.sx,d10.sy); ctx.lineTo(d11.sx,d11.sy); ctx.lineTo(d01.sx,d01.sy);
+    ctx.closePath();
+    ctx.fill();
+
+    // 창문(남쪽 벽 좌우, 동쪽 벽 하나) — 밤에는 따뜻한 불빛
+    drawWindow(b3,b2,t3,t2, 0.12,0.30, 0.32,0.64, isNight);
+    drawWindow(b3,b2,t3,t2, 0.70,0.88, 0.32,0.64, isNight);
+    drawWindow(b1,b2,t1,t2, 0.35,0.62, 0.30,0.60, isNight);
   }
 
   function drawScene(){
@@ -692,6 +834,9 @@
     ];
     treeSpots.forEach(t=> drawTree(t.x, t.z, t.h, shadeHex(theme.canopy, t.shade), cur.altDeg, cur.azFromSouthDeg, theme.decor));
 
+    // ---- 집(밤에는 창문에 불이 켜짐) ----
+    drawHouse(-0.15, -0.32, cur.altDeg, cur.azFromSouthDeg);
+
     // ---- 방위 라벨(동/서/남/북) ----
     ctx.fillStyle = 'rgba(255,255,255,0.95)';
     ctx.font = 'bold 20px sans-serif';
@@ -789,26 +934,66 @@
     document.getElementById(id).addEventListener('change', drawScene);
   });
 
-  // ---- 드래그로 천구 회전(마우스·터치 모두 지원) ----
-  let dragging = false, lastPX = 0, lastPY = 0;
+  // ---- 드래그로 천구 회전(마우스·터치 모두 지원, 놓은 뒤에는 미끄러지듯 서서히 멈춤) ----
+  let dragging = false, lastPX = 0, lastPY = 0, lastMoveT = 0;
+  let yawVel = 0, tiltVel = 0; // 관성(미끄러짐)용 각속도
+  let inertiaRAF = null;
+
+  function stopInertia(){
+    if(inertiaRAF){ cancelAnimationFrame(inertiaRAF); inertiaRAF = null; }
+  }
+  function inertiaStep(){
+    yawVel *= 0.94;
+    tiltVel *= 0.94;
+    if(Math.abs(yawVel) < 0.00005 && Math.abs(tiltVel) < 0.00005){
+      inertiaRAF = null;
+      return;
+    }
+    cameraYaw += yawVel;
+    cameraTilt = clamp(cameraTilt + tiltVel, deg2rad(10), deg2rad(80));
+    drawScene();
+    inertiaRAF = requestAnimationFrame(inertiaStep);
+  }
+
   canvas.addEventListener('pointerdown', (e)=>{
     dragging = true;
+    stopInertia();
+    yawVel = 0; tiltVel = 0;
     lastPX = e.clientX; lastPY = e.clientY;
+    lastMoveT = performance.now();
     canvas.setPointerCapture(e.pointerId);
   });
   canvas.addEventListener('pointermove', (e)=>{
     if(!dragging) return;
+    const now = performance.now();
+    const dt = Math.max(1, now - lastMoveT);
     const dx = e.clientX - lastPX, dy = e.clientY - lastPY;
     lastPX = e.clientX; lastPY = e.clientY;
+    lastMoveT = now;
     // 화면에 보이는 방향(특히 하늘 돔 쪽)이 손가락/마우스를 따라오도록 부호를 맞춤
-    cameraYaw -= dx * 0.008;
-    cameraTilt = clamp(cameraTilt + dy*0.006, deg2rad(10), deg2rad(80));
+    const dYaw = dx * 0.0085;
+    const dTilt = dy * 0.0062;
+    cameraYaw += dYaw;
+    cameraTilt = clamp(cameraTilt + dTilt, deg2rad(10), deg2rad(80));
+    // 최근 이동 속도를 관성(미끄러짐)에 사용할 각속도로 기록(시간 간격으로 정규화 후 프레임 단위로 환산)
+    const norm = Math.min(3, 16 / dt);
+    yawVel = dYaw * norm;
+    tiltVel = dTilt * norm;
     drawScene();
   });
   ['pointerup','pointercancel','pointerleave'].forEach(evt=>{
-    canvas.addEventListener(evt, ()=>{ dragging = false; });
+    canvas.addEventListener(evt, ()=>{
+      if(!dragging) return;
+      dragging = false;
+      if(Math.abs(yawVel) > 0.0002 || Math.abs(tiltVel) > 0.0002){
+        stopInertia();
+        inertiaRAF = requestAnimationFrame(inertiaStep);
+      }
+    });
   });
   document.getElementById('resetView').addEventListener('click', ()=>{
+    stopInertia();
+    yawVel = 0; tiltVel = 0;
     cameraYaw = 0;
     cameraTilt = DEFAULT_TILT;
     drawScene();
