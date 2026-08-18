@@ -158,7 +158,7 @@
 </head>
 <body>
   <div class="nameplate">
-    <div class="eyebrow">SCIENCE LAB INSTRUMENT · 6학년 2학기 1단원 계절의 변화 (3~4차시)</div>
+    <div class="eyebrow">SCIENCE LAB INSTRUMENT · 6학년 2학기 1단원 계절의 변화 (5~6차시)</div>
     <h1><span class="ico">🌐</span> 천구 태양 궤적 시뮬레이터</h1>
   </div>
 
@@ -727,13 +727,13 @@
     }
 
     // ---- 사계절 비교 궤적(옅게) ----
+    const seasons = [
+      { m:3,  color:'#5a9c46' },
+      { m:6,  color:'#d94f2b' },
+      { m:9,  color:'#c98a2e' },
+      { m:12, color:'#2f5fa8' }
+    ];
     if(compare){
-      const seasons = [
-        { m:3,  color:'#5a9c46' },
-        { m:6,  color:'#d94f2b' },
-        { m:9,  color:'#c98a2e' },
-        { m:12, color:'#2f5fa8' }
-      ];
       seasons.forEach(s=>{
         const d = computeMonthData(s.m);
         const pts = pathAltAz(d.decl, d.H0, 72);
@@ -773,6 +773,23 @@
     ctx.beginPath();
     ctx.ellipse(centerX, centerY, gEll.rh, gEll.rv, 0, 0, Math.PI*2);
     ctx.fill();
+
+    // ---- 궤적이 땅(원판)에 가려 끊겨 보이는 구간을, 땅 위로 살짝 비쳐 보이는 점선으로 표시 ----
+    // (태양 궤적은 항상 지평선 위에 있지만, 이 원근 투영에서는 지평선 부근 구간이
+    //  화면상 땅 타원과 겹쳐 불투명한 땅에 가려지므로, 비교에 필요한 구간을 점선으로 되살림)
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(centerX, centerY, gEll.rh, gEll.rv, 0, 0, Math.PI*2);
+    ctx.clip();
+    if(compare){
+      seasons.forEach(s=>{
+        const d = computeMonthData(s.m);
+        const pts = pathAltAz(d.decl, d.H0, 72);
+        strokeSkyPath(pts, R_ARC, s.color, s.m===month ? 2.6 : 1.7, [3,4]);
+      });
+    }
+    strokeSkyPath(curPts, R_ARC, '#e0790f', 2.8, [3,4]);
+    ctx.restore();
 
     if(theme.decor === 'snow'){
       // 겨울: 잔디 대신 반짝이는 눈 질감을 흩뿌림
