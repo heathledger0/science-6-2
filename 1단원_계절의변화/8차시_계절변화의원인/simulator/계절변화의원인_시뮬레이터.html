@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>계절 변화의 원인 시뮬레이터</title>
+<style>
+  :root{
+    --paper:#f2efe6;
+    --panel:#fffdf8;
+    --panel-line:#e4ddc9;
+    --ink:#242019;
+    --ink-soft:#6b6355;
+    --grid-line:rgba(60,50,20,0.07);
+    --accent-sun:#c8720f;
+    --accent-sun-glow:#e69a2e;
+    --accent-sky:#2f5fa8;
+    --accent-good:#3f7d54;
+    --lcd-bg:#20261f;
+    --lcd-text:#8ff0a4;
+    --lcd-text-dim:#4f7a5c;
+    --focus:#2f5fa8;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --paper:#14120d; --panel:#1e1b14; --panel-line:#3a3427; --ink:#efe9db; --ink-soft:#b3a98f;
+      --grid-line:rgba(255,240,200,0.06); --accent-sun:#e69a2e; --accent-sun-glow:#f4b559;
+      --accent-sky:#7fabe0; --accent-good:#6bc98a; --lcd-bg:#0f1a11; --lcd-text:#8ff0a4;
+      --lcd-text-dim:#3f6b4c; --focus:#7fabe0;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#14120d; --panel:#1e1b14; --panel-line:#3a3427; --ink:#efe9db; --ink-soft:#b3a98f;
+    --grid-line:rgba(255,240,200,0.06); --accent-sun:#e69a2e; --accent-sun-glow:#f4b559;
+    --accent-sky:#7fabe0; --accent-good:#6bc98a; --lcd-bg:#0f1a11; --lcd-text:#8ff0a4;
+    --lcd-text-dim:#3f6b4c; --focus:#7fabe0;
+  }
+  :root[data-theme="light"]{
+    --paper:#f2efe6; --panel:#fffdf8; --panel-line:#e4ddc9; --ink:#242019; --ink-soft:#6b6355;
+    --grid-line:rgba(60,50,20,0.07); --accent-sun:#c8720f; --accent-sun-glow:#e69a2e;
+    --accent-sky:#2f5fa8; --accent-good:#3f7d54; --lcd-bg:#20261f; --lcd-text:#8ff0a4;
+    --lcd-text-dim:#4f7a5c; --focus:#2f5fa8;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0; min-height:100%;
+    font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+    color:var(--ink);
+    background:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
+      var(--paper);
+    background-size:24px 24px, 24px 24px, auto;
+    display:flex; flex-direction:column; align-items:center;
+    padding:20px 14px 40px;
+    transition:background-color .2s ease, color .2s ease;
+  }
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important;} }
+
+  .nameplate{ width:100%; max-width:920px; margin-bottom:14px; }
+  .eyebrow{
+    font-family:'SFMono-Regular','Consolas',monospace; font-size:.68rem; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--ink-soft);
+  }
+  h1{ font-size:clamp(1.3rem, 1rem + 1.4vw, 1.9rem); font-weight:800; letter-spacing:-.01em; margin:2px 0 0; text-wrap:balance; }
+  h1 .ico{ display:inline-block; color:var(--accent-sun); }
+
+  .wrap{
+    width:100%; max-width:920px; background:var(--panel); border:1px solid var(--panel-line);
+    border-radius:18px; box-shadow:0 10px 30px rgba(30,25,10,0.10); padding:18px;
+  }
+  .screen{
+    position:relative; border-radius:14px; padding:8px;
+    background:linear-gradient(155deg, #d9d2bd, #c7bfa4);
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,0.15);
+  }
+  @media (prefers-color-scheme: dark){ .screen{ background:linear-gradient(155deg, #34301f, #221f16); } }
+  :root[data-theme="dark"] .screen{ background:linear-gradient(155deg, #34301f, #221f16); }
+  :root[data-theme="light"] .screen{ background:linear-gradient(155deg, #d9d2bd, #c7bfa4); }
+  canvas{ width:100%; aspect-ratio:4/5; border-radius:9px; display:block; touch-action:none; }
+  #stage{ cursor:grab; }
+  #stage:active{ cursor:grabbing; }
+
+  .legend{ display:flex; flex-wrap:wrap; gap:14px; margin-top:10px; padding:0 2px; }
+  .legend span{ display:inline-flex; align-items:center; gap:6px; font-size:.78rem; color:var(--ink-soft); }
+  .swatch{ width:16px; height:3px; border-radius:2px; display:inline-block; box-shadow:0 0 0 1px var(--panel-line); }
+  .dot{ width:9px; height:9px; border-radius:50%; display:inline-block; box-shadow:0 0 0 1px var(--panel-line); }
+
+  .panel{ margin-top:18px; display:grid; grid-template-columns:1fr; gap:14px; }
+  .control{ background:var(--paper); border-radius:12px; padding:12px 14px; border:1px solid var(--panel-line); }
+  .control label{ display:flex; justify-content:space-between; align-items:baseline; font-weight:700; font-size:.92rem; margin-bottom:8px; }
+  .control .value{ font-family:'SFMono-Regular','Consolas',monospace; font-variant-numeric:tabular-nums; color:var(--accent-sky); font-weight:700; }
+
+  input[type=range]{
+    -webkit-appearance:none; appearance:none; width:100%; height:6px; border-radius:99px;
+    background:linear-gradient(90deg, var(--accent-sun-glow) 0%, var(--accent-sun-glow) var(--fill,50%), var(--panel-line) var(--fill,50%), var(--panel-line) 100%);
+    outline-offset:4px;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:20px; height:20px; border-radius:50%; background:var(--panel);
+    border:3px solid var(--accent-sun); box-shadow:0 1px 3px rgba(0,0,0,.3); cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:14px; height:14px; border-radius:50%; background:var(--panel); border:3px solid var(--accent-sun); cursor:pointer;
+  }
+  input[type=range]:focus-visible{ outline:2px solid var(--focus); }
+
+  .toggles{ display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+  .toggles label{
+    display:flex; align-items:center; gap:6px; background:var(--paper); border:1px solid var(--panel-line);
+    border-radius:999px; padding:7px 13px; font-size:.84rem; cursor:pointer; user-select:none;
+  }
+  .toggles input:focus-visible{ outline:2px solid var(--focus); }
+
+  .readout{ margin-top:16px; display:flex; flex-wrap:wrap; gap:10px; }
+  .badge{ flex:1; min-width:160px; background:var(--lcd-bg); border-radius:12px; padding:12px 14px; text-align:left; box-shadow:inset 0 0 0 1px rgba(255,255,255,0.04); }
+  .badge .num{ font-family:'SFMono-Regular','Consolas',monospace; font-variant-numeric:tabular-nums; font-size:1.45rem; font-weight:700; color:var(--lcd-text); text-shadow:0 0 10px rgba(143,240,164,0.35); }
+  .badge .bar{ margin-top:8px; height:7px; border-radius:99px; background:rgba(255,255,255,0.1); overflow:hidden; }
+  .badge .bar-fill{ height:100%; border-radius:99px; background:var(--lcd-text); box-shadow:0 0 6px rgba(143,240,164,0.5); transition:width .25s ease; }
+  .badge .lab{ margin-top:8px; font-size:.72rem; letter-spacing:.03em; color:var(--lcd-text-dim); }
+
+  .note{ margin-top:16px; font-size:.85rem; color:var(--ink); background:var(--paper); border:1px dashed var(--panel-line); border-radius:10px; padding:12px 14px; line-height:1.55; }
+  .note b{ color:var(--accent-sun); }
+</style>
+</head>
+<body>
+  <div class="nameplate">
+    <div class="eyebrow">SCIENCE LAB INSTRUMENT · 6학년 2학기 1단원 계절의 변화 (8차시)</div>
+    <h1><span class="ico">🌍</span> 계절 변화의 원인 시뮬레이터</h1>
+  </div>
+
+  <div class="wrap">
+    <div class="screen">
+      <canvas id="stage" width="900" height="1125"></canvas>
+    </div>
+
+    <div class="legend">
+      <span><i class="swatch" style="background:#2f5fa8"></i>지구 공전 궤도</span>
+      <span><i class="swatch" style="background:#3f7d54"></i>자전축(항상 같은 방향)</span>
+      <span><i class="dot" style="background:#d9432b"></i>우리나라 위치</span>
+      <span><i class="swatch" style="background:#e0790f"></i>태양 빛</span>
+    </div>
+
+    <div class="panel">
+      <div class="control">
+        <label>공전 위치(월) <span class="value" id="monthVal">6월</span></label>
+        <!-- 주요 변수: 지구가 태양 주위 궤도의 어느 위치에 있는지(월, 1~12).
+             지구의 자전축은 궤도 위 어느 위치에 있든 "항상 같은 방향"을 유지한 채
+             평행하게 이동만 합니다 — 이것이 계절이 생기는 진짜 이유입니다. -->
+        <input type="range" id="monthSlider" min="1" max="12" step="0.25" value="6">
+      </div>
+    </div>
+
+    <div class="toggles">
+      <label><input type="checkbox" id="noTilt"> 자전축 기울기 없이 비교하기</label>
+      <label><input type="checkbox" id="showAllPos" checked> 사계절 위치 표시(춘분·하지·추분·동지)</label>
+    </div>
+
+    <div class="readout">
+      <div class="badge">
+        <div class="num" id="seasonOut">-</div>
+        <div class="lab">지금 우리나라 계절</div>
+      </div>
+      <div class="badge">
+        <div class="num" id="altOut">-</div>
+        <div class="bar"><div class="bar-fill" id="altBar" style="width:0%"></div></div>
+        <div class="lab">태양의 남중 고도</div>
+      </div>
+      <div class="badge">
+        <div class="num" id="energyOut">-</div>
+        <div class="bar"><div class="bar-fill" id="energyBar" style="width:0%"></div></div>
+        <div class="lab">태양 에너지 진하기(7차시와 동일 기준)</div>
+      </div>
+    </div>
+
+    <div class="note">
+      💡 <b>활용 팁</b>: 슬라이더로 지구를 궤도를 따라 한 바퀴 움직여 보세요. <b>자전축(초록 선)은 궤도 어디에 있든
+      항상 같은 방향을 가리킵니다</b> — 이 때문에 지구가 태양 주위를 돌면서 우리나라가 있는 북반구가 태양 쪽으로
+      기울 때(여름)와 태양 반대쪽으로 기울 때(겨울)가 번갈아 생기고, 그때마다 남중 고도와 에너지 진하기가 함께
+      바뀝니다. <b>"자전축 기울기 없이 비교하기"</b>를 켜면 지구를 아무리 돌려도 남중 고도가 전혀 바뀌지 않는 것을
+      확인할 수 있어요 — 계절은 지구가 태양에 가까워지고 멀어져서가 아니라, <b>자전축이 기울어진 채 공전하기
+      때문</b>에 생긴다는 것을 직접 눈으로 확인해 보세요.
+    </div>
+  </div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('stage');
+  const ctx = canvas.getContext('2d');
+  let W = 900, H = 1125;
+
+  function resizeCanvas(){
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    W = rect.width; H = rect.height;
+    canvas.width = Math.max(1, Math.round(W*dpr));
+    canvas.height = Math.max(1, Math.round(H*dpr));
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  // ---- 레이아웃(모두 W·H 비율로 정의 — 화면 폭이 좁아도 글씨/그림이 작아지지 않게) ----
+  let ORBIT_CX, ORBIT_CY, ORBIT_R, ORBIT_BOTTOM, ALT_TOP, ALT_BOTTOM, ALT_X0, ALT_X1;
+  let earthR, sunR, titleFont, labelFont, badgeFont;
+
+  function computeLayout(){
+    ORBIT_BOTTOM = H*0.56;
+    ORBIT_CX = W*0.5; ORBIT_CY = ORBIT_BOTTOM*0.46;
+    ORBIT_R = Math.min(W,ORBIT_BOTTOM)*0.36;
+    ALT_TOP = H*0.62; ALT_BOTTOM = H*0.97;
+    ALT_X0 = W*0.03; ALT_X1 = W*0.97;
+    earthR = W*0.028;
+    sunR = W*0.05;
+    titleFont = W*0.042;
+    labelFont = W*0.044;
+    badgeFont = W*0.038;
+  }
+
+  const LAT = 37.5;      // 우리나라(서울) 기준 위도
+  const TILT = 23.5;     // 지구 자전축 기울기(도)
+  // 화면상 자전축이 향하는 고정 방향(임의로 정한 뒤, 궤도 위치를 이 방향에 맞춰 일관되게 계산함)
+  const axisScreenLean = 25; // 수직에서 오른쪽으로 몇 도 기울어 보이게 그릴지(그림용 각도)
+  const axisVec = { x: Math.sin(deg2rad(axisScreenLean)), y: -Math.cos(deg2rad(axisScreenLean)) };
+  const axisAngle = Math.atan2(axisVec.y, axisVec.x);
+  const summerPhi = axisAngle + Math.PI; // 축이 태양쪽으로 가장 많이 기우는(=여름) 공전 위치
+
+  function deg2rad(d){ return d*Math.PI/180; }
+  function rad2deg(r){ return r*180/Math.PI; }
+  function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+
+  // 월 -> 태양의 적위(계절에 따라 -23.5°~+23.5°로 변함). 3월(춘분)=0, 6월(하지)=+23.5, 9월(추분)=0, 12월(동지)=-23.5
+  function declination(month){ return TILT * Math.sin(deg2rad((month-3)*30)); }
+  function altitudeFor(month, tiltOff){
+    const decl = tiltOff ? 0 : declination(month);
+    return 90 - LAT + decl;
+  }
+  function energyPct(altDeg){ return Math.max(0, Math.sin(deg2rad(altDeg))) * 100; }
+  function seasonName(month){
+    const m = ((month-1+12)%12)+1;
+    if(m>=3 && m<6) return '봄';
+    if(m>=6 && m<9) return '여름';
+    if(m>=9 && m<12) return '가을';
+    return '겨울';
+  }
+  // 월 -> 궤도 위 각도(화면 라디안). 자전축이 태양쪽으로 가장 기우는 위치(summerPhi)를 6월로 놓고,
+  // 한 달에 30°씩 이동시켜 나머지 달의 위치를 정함 (자전축 방향은 항상 고정!)
+  function orbitAngle(month){ return summerPhi + deg2rad((month-6)*30); }
+
+  const monthSlider = document.getElementById('monthSlider');
+  const monthVal = document.getElementById('monthVal');
+  const noTilt = document.getElementById('noTilt');
+  const showAllPos = document.getElementById('showAllPos');
+  const seasonOut = document.getElementById('seasonOut');
+  const altOut = document.getElementById('altOut');
+  const energyOut = document.getElementById('energyOut');
+  const altBar = document.getElementById('altBar');
+  const energyBar = document.getElementById('energyBar');
+
+  function updateSliderFill(slider){
+    const min = parseFloat(slider.min), max = parseFloat(slider.max), v = parseFloat(slider.value);
+    slider.style.setProperty('--fill', ((v-min)/(max-min))*100 + '%');
+  }
+
+  function drawEarthAt(month, isMain, tiltOff){
+    const phi = orbitAngle(month);
+    const ex = ORBIT_CX + ORBIT_R*Math.cos(phi);
+    const ey = ORBIT_CY + ORBIT_R*Math.sin(phi);
+    const r = isMain ? earthR : earthR*0.62;
+
+    // 태양 빛(태양 -> 지구)
+    if(isMain){
+      ctx.strokeStyle = 'rgba(224,121,15,0.55)';
+      ctx.lineWidth = Math.max(1.4, W*0.0026);
+      ctx.setLineDash([5,5]);
+      ctx.beginPath();
+      ctx.moveTo(ORBIT_CX, ORBIT_CY);
+      ctx.lineTo(ex, ey);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // 지구 몸체
+    ctx.fillStyle = isMain ? '#5b8fd6' : 'rgba(91,143,214,0.55)';
+    ctx.beginPath(); ctx.arc(ex, ey, r, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = isMain ? '#2f5fa8' : 'rgba(47,95,168,0.6)';
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+
+    // 자전축(기울기 비교 모드면 항상 수직, 아니면 고정 방향 유지)
+    const ax = tiltOff ? 0 : axisVec.x;
+    const ay = tiltOff ? -1 : axisVec.y;
+    const axisLen = r*2.1;
+    ctx.strokeStyle = isMain ? '#3f7d54' : 'rgba(63,125,84,0.55)';
+    ctx.lineWidth = isMain ? Math.max(2, W*0.0033) : 1.6;
+    ctx.beginPath();
+    ctx.moveTo(ex-ax*axisLen, ey-ay*axisLen);
+    ctx.lineTo(ex+ax*axisLen, ey+ay*axisLen);
+    ctx.stroke();
+
+    // 우리나라 위치(북반구, 축의 '북쪽' 방향 쪽에 살짝 치우친 지점)
+    const kx = ex + ax*r*0.55 + (-ay)*r*0.35;
+    const ky = ey + ay*r*0.55 + (ax)*r*0.35;
+    ctx.fillStyle = '#d9432b';
+    ctx.beginPath(); ctx.arc(kx, ky, Math.max(2, r*0.24), 0, Math.PI*2); ctx.fill();
+
+    if(isMain){
+      ctx.fillStyle = '#3a3226';
+      ctx.font = 'bold ' + labelFont.toFixed(1) + 'px sans-serif';
+      const seasonLabel = seasonName(month);
+      const titleClearance = H*0.045 + labelFont*0.8; // 위쪽 패널 제목과 겹치지 않도록
+      const below = ey + r + labelFont*1.3;
+      if(below < ORBIT_BOTTOM - labelFont*0.3){
+        ctx.textAlign = 'center';
+        ctx.fillText(seasonLabel, ex, below);
+      } else if(ey - r - labelFont*0.6 > titleClearance){
+        ctx.textAlign = 'center';
+        ctx.fillText(seasonLabel, ex, ey - r - labelFont*0.6);
+      } else {
+        ctx.textAlign = ex > ORBIT_CX ? 'left' : 'right';
+        ctx.fillText(seasonLabel, ex + (ex > ORBIT_CX ? r*1.4 : -r*1.4), ey + labelFont*0.35);
+      }
+      ctx.textAlign = 'left';
+    }
+    return { ex, ey };
+  }
+
+  function drawOrbitPanel(month, tiltOff){
+    // 궤도
+    ctx.strokeStyle = 'rgba(90,70,30,0.28)';
+    ctx.lineWidth = 1.4;
+    ctx.setLineDash([2,4]);
+    ctx.beginPath();
+    ctx.arc(ORBIT_CX, ORBIT_CY, ORBIT_R, 0, Math.PI*2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // 태양
+    const sunGlow = ctx.createRadialGradient(ORBIT_CX,ORBIT_CY,1,ORBIT_CX,ORBIT_CY,sunR*1.8);
+    sunGlow.addColorStop(0,'rgba(255,214,120,0.85)');
+    sunGlow.addColorStop(1,'rgba(255,214,120,0)');
+    ctx.fillStyle = sunGlow;
+    ctx.beginPath(); ctx.arc(ORBIT_CX,ORBIT_CY,sunR*1.8,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#ffcf5c';
+    ctx.beginPath(); ctx.arc(ORBIT_CX,ORBIT_CY,sunR,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#e0790f';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // 사계절 참고 위치(옅게)
+    if(showAllPos.checked){
+      [3,6,9,12].forEach(m=>{
+        if(Math.abs(m-month) > 0.2) drawEarthAt(m, false, tiltOff);
+      });
+    }
+    // 현재(메인) 위치
+    drawEarthAt(month, true, tiltOff);
+
+    ctx.fillStyle = '#5a4a30';
+    ctx.font = 'bold ' + titleFont.toFixed(1) + 'px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('지구의 공전(위에서 내려다본 모습)', W*0.02, H*0.045);
+  }
+
+  function drawAltitudePanel(month, tiltOff){
+    const panelH = ALT_BOTTOM - ALT_TOP;
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.fillRect(ALT_X0, ALT_TOP, ALT_X1-ALT_X0, panelH);
+    ctx.strokeStyle = 'rgba(90,70,30,0.25)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(ALT_X0, ALT_TOP, ALT_X1-ALT_X0, panelH);
+    ctx.fillStyle = '#5a4a30';
+    ctx.font = 'bold ' + titleFont.toFixed(1) + 'px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('우리나라의 남중 고도(옆에서 본 모습)', ALT_X0 + W*0.005, ALT_TOP - titleFont*0.6);
+
+    const groundY = ALT_TOP + panelH*0.72;
+    const groundX0 = ALT_X0 + W*0.02, groundX1 = ALT_X1 - W*0.02;
+    ctx.fillStyle = '#f5efd9';
+    ctx.fillRect(groundX0, groundY, groundX1-groundX0, panelH*0.2);
+    ctx.strokeStyle = 'rgba(90,70,30,0.4)';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.moveTo(groundX0, groundY); ctx.lineTo(groundX1, groundY); ctx.stroke();
+
+    const altDeg = altitudeFor(month, tiltOff);
+    const originX = (groundX0+groundX1)/2;
+    const rayLen = panelH*0.62;
+    const rad = deg2rad(altDeg);
+    const dx = Math.cos(rad), dy = -Math.sin(rad);
+    const startX = originX - dx*rayLen, startY = groundY + dy*rayLen; // dy는 음수라 위쪽으로 뻗음
+
+    ctx.strokeStyle = '#e0790f';
+    ctx.lineWidth = Math.max(2, W*0.004);
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    ctx.lineTo(originX, groundY);
+    ctx.stroke();
+
+    const glow = ctx.createRadialGradient(startX,startY,1,startX,startY,W*0.055);
+    glow.addColorStop(0,'rgba(255,214,120,0.9)');
+    glow.addColorStop(1,'rgba(255,214,120,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(startX,startY,W*0.055,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#ffcf5c';
+    ctx.beginPath(); ctx.arc(startX,startY,W*0.024,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#e0790f'; ctx.lineWidth = 1.6; ctx.stroke();
+
+    // 각도 표시(지평선과 태양 광선 사이)
+    const arcR = W*0.11;
+    ctx.strokeStyle = '#d9432b';
+    ctx.lineWidth = Math.max(1.6, W*0.003);
+    ctx.beginPath();
+    ctx.arc(originX, groundY, arcR, -Math.PI, -rad-Math.PI, true);
+    ctx.stroke();
+    ctx.fillStyle = '#d9432b';
+    ctx.font = 'bold ' + labelFont.toFixed(1) + 'px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(altDeg.toFixed(1)+'°', originX - arcR*1.35, groundY - arcR*0.5);
+    ctx.textAlign = 'left';
+
+    return altDeg;
+  }
+
+  function drawScene(){
+    computeLayout();
+    const month = parseFloat(monthSlider.value);
+    monthVal.textContent = month.toFixed(month%1===0?0:2) + '월';
+    updateSliderFill(monthSlider);
+
+    ctx.clearRect(0,0,W,H);
+
+    const skyGrad = ctx.createLinearGradient(0,0,0,H);
+    skyGrad.addColorStop(0, '#eaf3ff');
+    skyGrad.addColorStop(1, '#f7f3e8');
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0,0,W,H);
+
+    drawOrbitPanel(month, noTilt.checked);
+    const altDeg = drawAltitudePanel(month, noTilt.checked);
+
+    seasonOut.textContent = seasonName(month);
+    altOut.textContent = altDeg.toFixed(1) + '°';
+    energyOut.textContent = energyPct(altDeg).toFixed(0) + '%';
+    altBar.style.width = clamp((altDeg-20)/(90-20)*100, 4, 100) + '%';
+    energyBar.style.width = clamp(energyPct(altDeg), 4, 100) + '%';
+  }
+
+  [monthSlider, noTilt, showAllPos].forEach(el=>{
+    el.addEventListener('input', drawScene);
+    el.addEventListener('change', drawScene);
+  });
+
+  let resizeTimer = null;
+  window.addEventListener('resize', ()=>{
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(()=>{ resizeCanvas(); drawScene(); }, 80);
+  });
+
+  resizeCanvas();
+  drawScene();
+})();
+</script>
+</body>
+</html>
