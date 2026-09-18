@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>이산화 탄소와 생태계 피해 시뮬레이터</title>
+<style>
+  :root{
+    --paper:#f2efe6;
+    --panel:#fffdf8;
+    --panel-line:#e4ddc9;
+    --ink:#242019;
+    --ink-soft:#6b6355;
+    --grid-line:rgba(60,50,20,0.07);
+    --accent-sun:#c8720f;
+    --accent-sun-glow:#e69a2e;
+    --accent-sky:#2f5fa8;
+    --accent-good:#3f7d54;
+    --lcd-bg:#20261f;
+    --lcd-text:#8ff0a4;
+    --lcd-text-dim:#4f7a5c;
+    --focus:#2f5fa8;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --paper:#14120d; --panel:#1e1b14; --panel-line:#3a3427; --ink:#efe9db; --ink-soft:#b3a98f;
+      --grid-line:rgba(255,240,200,0.06); --accent-sun:#e69a2e; --accent-sun-glow:#f4b559;
+      --accent-sky:#7fabe0; --accent-good:#6bc98a; --lcd-bg:#0f1a11; --lcd-text:#8ff0a4;
+      --lcd-text-dim:#3f6b4c; --focus:#7fabe0;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#14120d; --panel:#1e1b14; --panel-line:#3a3427; --ink:#efe9db; --ink-soft:#b3a98f;
+    --grid-line:rgba(255,240,200,0.06); --accent-sun:#e69a2e; --accent-sun-glow:#f4b559;
+    --accent-sky:#7fabe0; --accent-good:#6bc98a; --lcd-bg:#0f1a11; --lcd-text:#8ff0a4;
+    --lcd-text-dim:#3f6b4c; --focus:#7fabe0;
+  }
+  :root[data-theme="light"]{
+    --paper:#f2efe6; --panel:#fffdf8; --panel-line:#e4ddc9; --ink:#242019; --ink-soft:#6b6355;
+    --grid-line:rgba(60,50,20,0.07); --accent-sun:#c8720f; --accent-sun-glow:#e69a2e;
+    --accent-sky:#2f5fa8; --accent-good:#3f7d54; --lcd-bg:#20261f; --lcd-text:#8ff0a4;
+    --lcd-text-dim:#4f7a5c; --focus:#2f5fa8;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0; min-height:100%;
+    font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+    color:var(--ink);
+    background:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
+      var(--paper);
+    background-size:24px 24px, 24px 24px, auto;
+    display:flex; flex-direction:column; align-items:center;
+    padding:20px 14px 40px;
+    transition:background-color .2s ease, color .2s ease;
+  }
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important;} }
+
+  .nameplate{ width:100%; max-width:920px; margin-bottom:14px; }
+  .eyebrow{
+    font-family:'SFMono-Regular','Consolas',monospace; font-size:.68rem; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--ink-soft);
+  }
+  h1{ font-size:clamp(1.3rem, 1rem + 1.4vw, 1.9rem); font-weight:800; letter-spacing:-.01em; margin:2px 0 0; text-wrap:balance; }
+  h1 .ico{ display:inline-block; }
+
+  .wrap{
+    width:100%; max-width:920px; background:var(--panel); border:1px solid var(--panel-line);
+    border-radius:18px; box-shadow:0 10px 30px rgba(30,25,10,0.10); padding:18px;
+  }
+  .screen{
+    position:relative; border-radius:14px; padding:8px;
+    background:linear-gradient(155deg, #d9d2bd, #c7bfa4);
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,0.15);
+  }
+  @media (prefers-color-scheme: dark){ .screen{ background:linear-gradient(155deg, #34301f, #221f16); } }
+  :root[data-theme="dark"] .screen{ background:linear-gradient(155deg, #34301f, #221f16); }
+  :root[data-theme="light"] .screen{ background:linear-gradient(155deg, #d9d2bd, #c7bfa4); }
+  canvas{ width:100%; aspect-ratio:4/5; border-radius:9px; display:block; touch-action:none; }
+
+  .legend{ display:flex; flex-wrap:wrap; gap:14px; margin-top:10px; padding:0 2px; }
+  .legend span{ display:inline-flex; align-items:center; gap:6px; font-size:.78rem; color:var(--ink-soft); }
+  .dot{ width:9px; height:9px; border-radius:50%; display:inline-block; box-shadow:0 0 0 1px var(--panel-line); }
+
+  .panel{ margin-top:18px; display:grid; grid-template-columns:1fr; gap:14px; }
+  .control{ background:var(--paper); border-radius:12px; padding:12px 14px; border:1px solid var(--panel-line); }
+  .control label{ display:flex; justify-content:space-between; align-items:baseline; font-weight:700; font-size:.92rem; margin-bottom:8px; }
+  .control .value{ font-family:'SFMono-Regular','Consolas',monospace; font-variant-numeric:tabular-nums; color:var(--accent-sky); font-weight:700; }
+
+  input[type=range]{
+    -webkit-appearance:none; appearance:none; width:100%; height:6px; border-radius:99px;
+    background:linear-gradient(90deg, #3f7d54 0%, #e6c62e 40%, #d9432b 100%);
+    outline-offset:4px;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:20px; height:20px; border-radius:50%; background:var(--panel);
+    border:3px solid var(--accent-sun); box-shadow:0 1px 3px rgba(0,0,0,.3); cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:14px; height:14px; border-radius:50%; background:var(--panel); border:3px solid var(--accent-sun); cursor:pointer;
+  }
+  input[type=range]:focus-visible{ outline:2px solid var(--focus); }
+
+  .toggles{ display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+  .toggles label{
+    display:flex; align-items:center; gap:6px; background:var(--paper); border:1px solid var(--panel-line);
+    border-radius:999px; padding:7px 13px; font-size:.84rem; cursor:pointer; user-select:none;
+  }
+  .toggles input:focus-visible{ outline:2px solid var(--focus); }
+
+  .readout{ margin-top:16px; display:flex; flex-wrap:wrap; gap:10px; }
+  .badge{ flex:1; min-width:160px; background:var(--lcd-bg); border-radius:12px; padding:12px 14px; text-align:left; box-shadow:inset 0 0 0 1px rgba(255,255,255,0.04); }
+  .badge .num{ font-family:'SFMono-Regular','Consolas',monospace; font-variant-numeric:tabular-nums; font-size:1.45rem; font-weight:700; color:var(--lcd-text); text-shadow:0 0 10px rgba(143,240,164,0.35); }
+  .badge .bar{ margin-top:8px; height:7px; border-radius:99px; background:rgba(255,255,255,0.1); overflow:hidden; }
+  .badge .bar-fill{ height:100%; border-radius:99px; background:var(--lcd-text); box-shadow:0 0 6px rgba(143,240,164,0.5); transition:width .25s ease, background .25s ease; }
+  .badge .lab{ margin-top:8px; font-size:.72rem; letter-spacing:.03em; color:var(--lcd-text-dim); }
+
+  .note{ margin-top:16px; font-size:.85rem; color:var(--ink); background:var(--paper); border:1px dashed var(--panel-line); border-radius:10px; padding:12px 14px; line-height:1.55; }
+  .note b{ color:var(--accent-sun); }
+</style>
+</head>
+<body>
+  <div class="nameplate">
+    <div class="eyebrow">SCIENCE LAB INSTRUMENT · 6학년 2학기 2단원 물질의 연소 (7차시)</div>
+    <h1><span class="ico">🌏</span> 이산화 탄소와 생태계 피해 시뮬레이터</h1>
+  </div>
+
+  <div class="wrap">
+    <div class="screen">
+      <canvas id="stage" width="900" height="1125"></canvas>
+    </div>
+
+    <div class="legend">
+      <span><i class="dot" style="background:#3f7d54"></i>건강한 상태</span>
+      <span><i class="dot" style="background:#e6c62e"></i>주의</span>
+      <span><i class="dot" style="background:#d9772e"></i>위험</span>
+      <span><i class="dot" style="background:#d9432b"></i>심각</span>
+    </div>
+
+    <div class="panel">
+      <div class="control">
+        <label>대기 중 이산화 탄소 농도(ppm) <span class="value" id="ppmVal">280ppm</span></label>
+        <!-- 주요 변수: 대기 중 이산화 탄소 농도(ppm). 산업화 이전 약 280ppm에서
+             현재 420ppm을 지나 더 올라갈 수 있음을 보여줌. 농도가 높아질수록
+             네 가지 생태계 피해 사례(구상나무, 산호초, 조개류, 북극 해빙)가
+             동시에 심해지는 모습을 보여준다. -->
+        <input type="range" id="ppmSlider" min="280" max="600" step="5" value="280">
+      </div>
+    </div>
+
+    <div class="toggles">
+      <label><input type="checkbox" id="showNow" checked> 오늘날 농도(약 420ppm) 표시</label>
+    </div>
+
+    <div class="readout">
+      <div class="badge">
+        <div class="num" id="riseOut">-</div>
+        <div class="bar"><div class="bar-fill" id="riseBar" style="width:0%"></div></div>
+        <div class="lab">산업화 이전(280ppm)보다 늘어난 양</div>
+      </div>
+      <div class="badge">
+        <div class="num" id="stageOut">-</div>
+        <div class="bar"><div class="bar-fill" id="stageBar" style="width:0%"></div></div>
+        <div class="lab">생태계 피해 단계</div>
+      </div>
+    </div>
+
+    <div class="note">
+      💡 <b>활용 팁</b>: 슬라이더를 오른쪽으로 움직여 대기 중 이산화 탄소 농도를 높여 보세요. 네 가지 실제 생태계
+      피해 사례 — <b>구상나무 숲, 산호초, 조개류, 북극 해빙</b> — 가 이산화 탄소 농도에 따라 <b>동시에</b> 나빠지는
+      것을 볼 수 있어요. 이것은 연소 생성물인 이산화 탄소 하나가 늘어나는 것만으로도 지구 곳곳의 서로 다른
+      생태계에 함께 영향을 준다는 것을 보여줍니다. "오늘날 농도 표시"를 켜면 지금 우리가 이미 어느 지점에
+      와 있는지 확인할 수 있어요. (그림은 실제 관측 자료를 바탕으로 한 단순화된 표현이며, 정확한 수치 모델이
+      아니라 변화의 경향을 보여주기 위한 것입니다.)
+    </div>
+  </div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('stage');
+  const ctx = canvas.getContext('2d');
+  let W = 900, H = 1125;
+
+  function resizeCanvas(){
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    W = rect.width; H = rect.height;
+    canvas.width = Math.max(1, Math.round(W*dpr));
+    canvas.height = Math.max(1, Math.round(H*dpr));
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  const PPM_MIN = 280, PPM_MAX = 600, PPM_NOW = 420;
+
+  let GRID_TOP, GRID_BOTTOM, CARD_GAP, cardW, cardH, col0X, col1X, row0Y, row1Y;
+  let titleFont, cardTitleFont, capFont;
+
+  function computeLayout(){
+    GRID_TOP = H*0.10;
+    GRID_BOTTOM = H*0.86;
+    CARD_GAP = W*0.03;
+    cardW = (W - W*0.06 - CARD_GAP) / 2;
+    cardH = (GRID_BOTTOM - GRID_TOP - CARD_GAP) / 2;
+    col0X = W*0.03; col1X = col0X + cardW + CARD_GAP;
+    row0Y = GRID_TOP; row1Y = row0Y + cardH + CARD_GAP;
+    titleFont = W*0.042;
+    cardTitleFont = W*0.036;
+    capFont = W*0.032;
+  }
+
+  const ppmSlider = document.getElementById('ppmSlider');
+  const ppmVal = document.getElementById('ppmVal');
+  const showNow = document.getElementById('showNow');
+  const riseOut = document.getElementById('riseOut');
+  const stageOut = document.getElementById('stageOut');
+  const riseBar = document.getElementById('riseBar');
+  const stageBar = document.getElementById('stageBar');
+
+  function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+  function lerp(a,b,t){ return a + (b-a)*t; }
+  function lerpColor(c1,c2,t){
+    return [Math.round(lerp(c1[0],c2[0],t)), Math.round(lerp(c1[1],c2[1],t)), Math.round(lerp(c1[2],c2[2],t))];
+  }
+  function rgb(c){ return `rgb(${c[0]},${c[1]},${c[2]})`; }
+
+  function severity(ppm){ return clamp((ppm-PPM_MIN)/(PPM_MAX-PPM_MIN), 0, 1); }
+  function stageInfo(t){
+    if(t < 0.25) return { name:'안전', color:'#3f7d54' };
+    if(t < 0.5) return { name:'주의', color:'#c9a227' };
+    if(t < 0.75) return { name:'위험', color:'#d9772e' };
+    return { name:'심각', color:'#d9432b' };
+  }
+
+  function updateSliderFill(){ /* 슬라이더 배경은 CSS 그라데이션 고정 사용 */ }
+
+  // ---- 카드 공통 틀 ----
+  function drawCardFrame(x, y, w, h, title, skyTop, skyBottom){
+    ctx.save();
+    ctx.beginPath();
+    const r = w*0.03;
+    ctx.moveTo(x+r,y);
+    ctx.arcTo(x+w,y,x+w,y+h,r);
+    ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r);
+    ctx.arcTo(x,y,x+w,y,r);
+    ctx.closePath();
+    ctx.clip();
+
+    const grad = ctx.createLinearGradient(0,y,0,y+h);
+    grad.addColorStop(0, skyTop);
+    grad.addColorStop(1, skyBottom);
+    ctx.fillStyle = grad;
+    ctx.fillRect(x,y,w,h);
+
+    return { clipRestore: ()=>ctx.restore() };
+  }
+
+  function drawCardTitle(x, y, w, title){
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    ctx.fillRect(x, y, w, cardTitleFont*1.9);
+    ctx.fillStyle = '#3a3226';
+    ctx.font = 'bold ' + cardTitleFont.toFixed(1) + 'px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(title, x + w*0.04, y + cardTitleFont*1.3);
+  }
+
+  // 1) 구상나무 숲
+  function drawForestCard(x,y,w,h,t){
+    const frame = drawCardFrame(x,y,w,h, '구상나무 숲', '#cdeaff', '#eaf3e0');
+    const groundY = y + h*0.78;
+    ctx.fillStyle = '#cdb98a';
+    ctx.fillRect(x, groundY, w, h - (groundY-y));
+
+    const healthy = [63,141,84], dead = [138,120,96];
+    const nTrees = 5;
+    for(let i=0;i<nTrees;i++){
+      const fx = x + w*(0.14 + i*0.18);
+      const dead_i = t > (i+1)/(nTrees+1); // 심각도가 높을수록 더 많은 나무가 고사
+      const treeH = h*0.30;
+      const baseY = groundY;
+      if(dead_i){
+        ctx.strokeStyle = rgb(dead);
+        ctx.lineWidth = Math.max(2, w*0.012);
+        ctx.beginPath();
+        ctx.moveTo(fx, baseY);
+        ctx.lineTo(fx - w*0.01, baseY - treeH*0.9);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(fx, baseY - treeH*0.35);
+        ctx.lineTo(fx + w*0.035, baseY - treeH*0.55);
+        ctx.stroke();
+      } else {
+        const localT = clamp(t*(nTrees+1) - i, 0, 1)*0.6;
+        const col = rgb(lerpColor(healthy, dead, localT));
+        ctx.fillStyle = col;
+        for(let s=0;s<3;s++){
+          const segH = treeH*0.4;
+          const segY = baseY - s*segH*0.62;
+          const segW = w*0.09*(1 - s*0.18);
+          ctx.beginPath();
+          ctx.moveTo(fx, segY-segH);
+          ctx.lineTo(fx-segW, segY);
+          ctx.lineTo(fx+segW, segY);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.strokeStyle = '#6b4a2c';
+        ctx.lineWidth = Math.max(1.5, w*0.006);
+        ctx.beginPath();
+        ctx.moveTo(fx, baseY);
+        ctx.lineTo(fx, baseY - treeH*0.15);
+        ctx.stroke();
+      }
+    }
+    frame.clipRestore();
+    drawCardTitle(x,y,w,'구상나무 숲');
+
+    const alive = nTrees - Math.round(t*nTrees);
+    ctx.fillStyle = '#3a3226';
+    ctx.font = capFont.toFixed(1) + 'px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('건강한 나무 ' + Math.max(alive,0) + '/' + nTrees + '그루', x+w/2, y+h - capFont*0.6);
+    ctx.textAlign = 'left';
+  }
+
+  // 2) 산호초
+  function drawReefCard(x,y,w,h,t){
+    const frame = drawCardFrame(x,y,w,h, '산호초', '#bfe3ff', '#1c5f8a');
+    const vivid = [214,64,120], bleached = [255,255,255];
+    const positions = [[0.22,0.72],[0.42,0.62],[0.62,0.75],[0.8,0.6],[0.5,0.85]];
+    positions.forEach(([px,py], i)=>{
+      const cx = x + w*px, cy = y + h*py;
+      const localT = clamp(t*1.3 - i*0.06, 0, 1);
+      const col = rgb(lerpColor(vivid, bleached, localT));
+      ctx.fillStyle = col;
+      ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+      ctx.lineWidth = 1;
+      const branches = 5;
+      for(let b=0;b<branches;b++){
+        const ang = -Math.PI/2 + (b-(branches-1)/2)*0.32;
+        const len = w*0.09;
+        ctx.beginPath();
+        ctx.moveTo(cx,cy);
+        ctx.lineTo(cx+Math.cos(ang)*len, cy+Math.sin(ang)*len);
+        ctx.lineWidth = Math.max(3, w*0.02);
+        ctx.strokeStyle = col;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+      }
+    });
+    // 물고기(피해가 심할수록 옅어짐 = 떠나감)
+    ctx.globalAlpha = clamp(1 - t*1.1, 0, 1);
+    ctx.fillStyle = '#ffcf5c';
+    [[0.28,0.32],[0.62,0.25],[0.75,0.4]].forEach(([px,py])=>{
+      const fx = x+w*px, fy=y+h*py, s=w*0.028;
+      ctx.beginPath();
+      ctx.moveTo(fx-s,fy); ctx.lineTo(fx+s,fy-s*0.6); ctx.lineTo(fx+s,fy+s*0.6); ctx.closePath(); ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+    frame.clipRestore();
+    drawCardTitle(x,y,w,'산호초');
+
+    ctx.fillStyle = '#eef7ff';
+    ctx.font = capFont.toFixed(1) + 'px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('백화 정도 ' + Math.round(t*100) + '%', x+w/2, y+h - capFont*0.6);
+    ctx.textAlign = 'left';
+  }
+
+  // 3) 조개류
+  function drawShellCard(x,y,w,h,t){
+    const frame = drawCardFrame(x,y,w,h, '조개류', '#bfe3ff', '#e8dcb8');
+    const groundY = y+h*0.62;
+    ctx.fillStyle = '#e3d3a0';
+    ctx.fillRect(x, groundY, w, h-(groundY-y));
+
+    const positions = [[0.28,0], [0.52,1], [0.76,0]];
+    positions.forEach(([px], i)=>{
+      const cx = x + w*px, cy = groundY - h*0.05;
+      const rShell = w*0.09 * (1 - t*0.28);
+      ctx.save();
+      ctx.translate(cx,cy);
+      ctx.fillStyle = '#e9e4d6';
+      ctx.strokeStyle = '#a89a78';
+      ctx.lineWidth = Math.max(1.5, w*0.006);
+      ctx.beginPath();
+      ctx.ellipse(0,0, rShell, rShell*0.78, 0, 0, Math.PI*2);
+      ctx.fill();
+      ctx.stroke();
+      // 부채살 무늬
+      ctx.strokeStyle = 'rgba(150,130,90,0.5)';
+      for(let k=-3;k<=3;k++){
+        ctx.beginPath();
+        ctx.moveTo(0,0);
+        ctx.lineTo(Math.sin(k*0.25)*rShell, -Math.cos(k*0.25)*rShell*0.78);
+        ctx.stroke();
+      }
+      // 심각도가 높을수록 금(균열)이 보임
+      if(t > 0.35){
+        ctx.strokeStyle = 'rgba(120,40,20,0.7)';
+        ctx.lineWidth = Math.max(1.5, w*0.007);
+        const crackN = t > 0.7 ? 3 : 1;
+        for(let c=0;c<crackN;c++){
+          ctx.beginPath();
+          ctx.moveTo(-rShell*0.3 + c*rShell*0.25, -rShell*0.5);
+          ctx.lineTo(rShell*0.1 - c*rShell*0.2, rShell*0.5);
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+    });
+    frame.clipRestore();
+    drawCardTitle(x,y,w,'조개류');
+
+    ctx.fillStyle = '#3a3226';
+    ctx.font = capFont.toFixed(1) + 'px sans-serif';
+    ctx.textAlign = 'center';
+    const label = t < 0.35 ? '껍데기가 튼튼해요' : (t < 0.7 ? '껍데기가 얇아져요' : '껍데기가 잘 깨져요');
+    ctx.fillText(label, x+w/2, y+h - capFont*0.6);
+    ctx.textAlign = 'left';
+  }
+
+  // 4) 북극 해빙
+  function drawArcticCard(x,y,w,h,t){
+    const frame = drawCardFrame(x,y,w,h, '북극 해빙', '#eaf6ff', '#2f6fa8');
+    const cx = x + w*0.5, cy = y+h*0.62;
+    const iceScale = lerp(1, 0.32, t);
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, w*0.36*iceScale, h*0.14*iceScale, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(150,190,220,0.8)';
+    ctx.lineWidth = Math.max(1.5, w*0.006);
+    ctx.stroke();
+
+    // 북극곰
+    const bx = cx, by = cy - h*0.14*iceScale*0.4;
+    const bs = w*0.09;
+    ctx.fillStyle = '#fdfdf6';
+    ctx.strokeStyle = 'rgba(150,140,110,0.6)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.ellipse(bx, by, bs, bs*0.62, 0, 0, Math.PI*2);
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(bx+bs*0.85, by-bs*0.15, bs*0.42, bs*0.34, 0, 0, Math.PI*2);
+    ctx.fill(); ctx.stroke();
+
+    frame.clipRestore();
+    drawCardTitle(x,y,w,'북극 해빙');
+
+    ctx.fillStyle = '#eef7ff';
+    ctx.font = capFont.toFixed(1) + 'px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('해빙 면적 ' + Math.round((1-t)*100) + '%', x+w/2, y+h - capFont*0.6);
+    ctx.textAlign = 'left';
+  }
+
+  function drawScene(){
+    computeLayout();
+    const ppm = parseFloat(ppmSlider.value);
+    ppmVal.textContent = ppm.toFixed(0) + 'ppm';
+    const t = severity(ppm);
+    const st = stageInfo(t);
+
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = '#faf7ee';
+    ctx.fillRect(0,0,W,H);
+
+    ctx.fillStyle = '#3a3226';
+    ctx.font = 'bold ' + titleFont.toFixed(1) + 'px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('대기 중 이산화 탄소 농도: ' + ppm.toFixed(0) + 'ppm', W*0.03, H*0.055);
+
+    drawForestCard(col0X, row0Y, cardW, cardH, t);
+    drawReefCard(col1X, row0Y, cardW, cardH, t);
+    drawShellCard(col0X, row1Y, cardW, cardH, t);
+    drawArcticCard(col1X, row1Y, cardW, cardH, t);
+
+    // 오늘날 농도 안내
+    if(showNow.checked){
+      ctx.fillStyle = st.color;
+      ctx.font = 'bold ' + capFont.toFixed(1) + 'px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('※ 오늘날 대기 중 농도는 약 ' + PPM_NOW + 'ppm이에요', W*0.03, H*0.925);
+    }
+
+    const riseAmt = ppm - PPM_MIN;
+    riseOut.textContent = '+' + riseAmt.toFixed(0) + 'ppm';
+    riseBar.style.width = clamp(riseAmt/(PPM_MAX-PPM_MIN)*100, 4, 100) + '%';
+    riseBar.style.background = st.color;
+
+    stageOut.textContent = st.name;
+    stageBar.style.width = clamp(t*100, 4, 100) + '%';
+    stageBar.style.background = st.color;
+  }
+
+  [ppmSlider, showNow].forEach(el=>{
+    el.addEventListener('input', drawScene);
+    el.addEventListener('change', drawScene);
+  });
+
+  let resizeTimer = null;
+  window.addEventListener('resize', ()=>{
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(()=>{ resizeCanvas(); drawScene(); }, 80);
+  });
+
+  resizeCanvas();
+  drawScene();
+})();
+</script>
+</body>
+</html>
