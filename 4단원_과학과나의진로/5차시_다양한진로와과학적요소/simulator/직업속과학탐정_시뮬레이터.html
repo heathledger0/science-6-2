@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>직업 속 과학 탐정 시뮬레이터</title>
+<style>
+  :root{
+    --paper:#f2efe6;
+    --panel:#fffdf8;
+    --panel-line:#e4ddc9;
+    --ink:#242019;
+    --ink-soft:#6b6355;
+    --grid-line:rgba(60,50,20,0.07);
+    --accent-sun:#c8720f;
+    --accent-sky:#2f5fa8;
+    --accent-good:#3f7d54;
+    --card-bg:#fffdf8;
+    --know-bg:#eaf2ff;
+    --know-ink:#1f4f8f;
+    --inq-bg:#eaf7ee;
+    --inq-ink:#2a6b3f;
+    --lcd-bg:#20261f;
+    --lcd-text:#8ff0a4;
+    --focus:#2f5fa8;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --paper:#14120d; --panel:#1e1b14; --panel-line:#3a3427; --ink:#efe9db; --ink-soft:#b3a98f;
+      --grid-line:rgba(255,240,200,0.06); --accent-sun:#e69a2e; --accent-sky:#7fabe0; --accent-good:#6bc98a;
+      --card-bg:#201c14; --know-bg:#17263d; --know-ink:#9cc3f5; --inq-bg:#152b1c; --inq-ink:#8fd9a3;
+      --lcd-bg:#0f1a11; --lcd-text:#8ff0a4; --focus:#7fabe0;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#14120d; --panel:#1e1b14; --panel-line:#3a3427; --ink:#efe9db; --ink-soft:#b3a98f;
+    --grid-line:rgba(255,240,200,0.06); --accent-sun:#e69a2e; --accent-sky:#7fabe0; --accent-good:#6bc98a;
+    --card-bg:#201c14; --know-bg:#17263d; --know-ink:#9cc3f5; --inq-bg:#152b1c; --inq-ink:#8fd9a3;
+    --lcd-bg:#0f1a11; --lcd-text:#8ff0a4; --focus:#7fabe0;
+  }
+  :root[data-theme="light"]{
+    --paper:#f2efe6; --panel:#fffdf8; --panel-line:#e4ddc9; --ink:#242019; --ink-soft:#6b6355;
+    --grid-line:rgba(60,50,20,0.07); --accent-sun:#c8720f; --accent-sky:#2f5fa8; --accent-good:#3f7d54;
+    --card-bg:#fffdf8; --know-bg:#eaf2ff; --know-ink:#1f4f8f; --inq-bg:#eaf7ee; --inq-ink:#2a6b3f;
+    --lcd-bg:#20261f; --lcd-text:#8ff0a4; --focus:#2f5fa8;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0; min-height:100%;
+    font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+    color:var(--ink);
+    background:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
+      var(--paper);
+    background-size:24px 24px, 24px 24px, auto;
+    display:flex; flex-direction:column; align-items:center;
+    padding:20px 14px 40px;
+  }
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important;} }
+
+  .nameplate{ width:100%; max-width:960px; margin-bottom:14px; }
+  .eyebrow{
+    font-family:'SFMono-Regular','Consolas',monospace; font-size:.68rem; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--ink-soft);
+  }
+  h1{ font-size:clamp(1.3rem, 1rem + 1.4vw, 1.9rem); font-weight:800; letter-spacing:-.01em; margin:2px 0 0; text-wrap:balance; }
+
+  .wrap{
+    width:100%; max-width:960px; background:var(--panel); border:1px solid var(--panel-line);
+    border-radius:18px; box-shadow:0 10px 30px rgba(30,25,10,0.10); padding:18px;
+  }
+
+  .progress-row{ display:flex; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap; }
+  .progress-badge{ background:var(--lcd-bg); border-radius:12px; padding:10px 16px; flex:1; min-width:220px; }
+  .progress-badge .num{ font-family:'SFMono-Regular','Consolas',monospace; font-size:1.2rem; font-weight:700; color:var(--lcd-text); }
+  .progress-bar{ margin-top:6px; height:7px; border-radius:99px; background:rgba(255,255,255,0.1); overflow:hidden; }
+  .progress-fill{ height:100%; border-radius:99px; background:var(--lcd-text); transition:width .3s ease; }
+
+  .grid{
+    display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:12px;
+  }
+  .card{
+    background:var(--card-bg); border:1px solid var(--panel-line); border-radius:14px;
+    padding:14px 10px; text-align:center; cursor:pointer; user-select:none;
+    transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+    display:flex; flex-direction:column; align-items:center; gap:6px;
+  }
+  .card:hover{ transform:translateY(-2px); box-shadow:0 6px 16px rgba(30,25,10,0.12); }
+  .card:focus-visible{ outline:2px solid var(--focus); outline-offset:2px; }
+  .card.done{ border-color:var(--accent-good); }
+  .card .emoji{ font-size:2rem; line-height:1; }
+  .card .name{ font-weight:700; font-size:.92rem; }
+  .card .check{ font-size:.72rem; color:var(--accent-good); font-weight:700; min-height:1em; }
+
+  .detail{
+    margin-top:18px; border-radius:14px; border:1px solid var(--panel-line); overflow:hidden;
+    display:none;
+  }
+  .detail.show{ display:block; animation:fadeIn .25s ease; }
+  @keyframes fadeIn{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
+  .detail-head{ padding:14px 18px; background:var(--card-bg); display:flex; align-items:center; gap:12px; border-bottom:1px solid var(--panel-line); }
+  .detail-head .emoji{ font-size:2.2rem; }
+  .detail-head .name{ font-size:1.2rem; font-weight:800; }
+  .detail-body{ padding:16px 18px; display:flex; flex-direction:column; gap:12px; }
+  .box{ border-radius:12px; padding:12px 14px; }
+  .box .label{ font-size:.74rem; font-weight:800; letter-spacing:.04em; margin-bottom:6px; }
+  .box.know{ background:var(--know-bg); color:var(--know-ink); }
+  .box.inq{ background:var(--inq-bg); color:var(--inq-ink); }
+  .box p{ margin:0; line-height:1.55; font-size:.92rem; }
+
+  .placeholder{
+    margin-top:18px; border-radius:14px; border:1px dashed var(--panel-line); padding:24px;
+    text-align:center; color:var(--ink-soft); font-size:.92rem;
+  }
+
+  .summary{
+    margin-top:18px; border-radius:14px; padding:18px; background:linear-gradient(135deg, var(--know-bg), var(--inq-bg));
+    text-align:center; display:none;
+  }
+  .summary.show{ display:block; animation:fadeIn .3s ease; }
+  .summary .big{ font-size:1.15rem; font-weight:800; margin-bottom:6px; }
+  .summary p{ margin:4px 0 0; line-height:1.6; font-size:.92rem; color:var(--ink); }
+
+  .note{ margin-top:16px; font-size:.85rem; color:var(--ink); background:var(--paper); border:1px dashed var(--panel-line); border-radius:10px; padding:12px 14px; line-height:1.55; }
+  .note b{ color:var(--accent-sun); }
+</style>
+</head>
+<body>
+  <div class="nameplate">
+    <div class="eyebrow">SCIENCE LAB INSTRUMENT · 6학년 2학기 4단원 과학과 나의 진로 (5차시)</div>
+    <h1>🔍 직업 속 과학 탐정 시뮬레이터</h1>
+  </div>
+
+  <div class="wrap">
+    <div class="progress-row">
+      <div class="progress-badge">
+        <div class="num" id="progressNum">탐색한 직업 0 / 8</div>
+        <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+      </div>
+    </div>
+
+    <div class="grid" id="jobGrid"></div>
+
+    <div class="placeholder" id="placeholder">👆 위에서 직업 카드를 하나 눌러 보세요. 그 직업에 숨어 있는 과학을 찾아드릴게요!</div>
+    <div class="detail" id="detail">
+      <div class="detail-head">
+        <div class="emoji" id="detEmoji">🍳</div>
+        <div class="name" id="detName">요리사</div>
+      </div>
+      <div class="detail-body">
+        <div class="box know">
+          <div class="label">🧪 필요한 과학 지식</div>
+          <p id="detKnow"></p>
+        </div>
+        <div class="box inq">
+          <div class="label">🔬 과학적 탐구 과정</div>
+          <p id="detInq"></p>
+        </div>
+      </div>
+    </div>
+
+    <div class="summary" id="summary">
+      <div class="big">🎉 8개 직업을 모두 탐색했어요!</div>
+      <p>식당의 요리사부터 반려동물 훈련 상담사까지, 전혀 과학과 관련 없어 보이던 직업에도<br>
+      <b>과학 지식</b>과 <b>과학적 탐구 과정</b>이 숨어 있었죠? 과학은 과학자만의 것이 아니라,<br>
+      우리 주변 거의 모든 직업과 관련이 있답니다.</p>
+    </div>
+
+    <div class="note">
+      💡 <b>활용 팁</b>: 카드를 누르면 그 직업에 필요한 <b>과학 지식</b>(알아야 할 과학 내용)과
+      <b>과학적 탐구 과정</b>(문제를 해결하기 위해 거치는 관찰·비교·분석 과정)이 나뉘어 나타나요.
+      8개를 모두 눌러 보면서 "과학자가 아닌 직업에는 과학이 필요 없다"는 생각이 맞는지 함께 확인해 보세요.
+    </div>
+  </div>
+
+<script>
+(function(){
+  const jobs = [
+    { emoji:'🍲', name:'요리사',
+      know:'설탕, 소금 등의 용질이 물에 얼마나 잘 용해되는지 이해해야 합니다. 다양한 미생물을 이용해 김치, 요구르트 같은 음식이 만들어지는 것도 알아야 합니다.',
+      inq:'음식을 맛있게 하려면 재료를 얼마만큼 익혀야 하는지 알아야 합니다. 그래서 재료를 익히는 시간을 다르게 해 음식을 만들고 맛을 비교합니다.' },
+    { emoji:'🚒', name:'소방관',
+      know:'화재를 진압할 때는 연소의 조건(탈 물질, 산소, 발화점 이상의 온도)과 이산화 탄소의 성질 같은 과학 지식을 알아야 합니다.',
+      inq:'발화점 아래로 빠르게 온도를 낮추기 위해 소방 헬기와 호스를 동시에 이용해 물을 뿌려야 한다는 것처럼, 화재 상황을 관찰해 알맞은 소화 방법을 찾는 탐구 과정을 거칩니다.' },
+    { emoji:'🌱', name:'스마트 팜 운영자',
+      know:'식물의 한살이와 식물이 잘 자라는 조건(빛, 물, 온도 등) 같은 과학 지식을 알아야 합니다.',
+      inq:'식물에 물을 주는 방식을 다르게 해서 어느 쪽이 잘 자라는지 확인해 보는 것처럼, 과학적 탐구 과정을 거쳐야 합니다.' },
+    { emoji:'🎥', name:'개인 미디어 콘텐츠 제작자',
+      know:'빛의 성질과 소리의 전달 같은 과학 지식을 알아야 합니다.',
+      inq:'빛의 성질을 활용해 그림자가 생기지 않도록 조명을 설치하는 위치를 조절하는 과정을 거칩니다.' },
+    { emoji:'🏃', name:'스포츠 트레이너',
+      know:'우리 몸의 구조와 기능, 뼈와 근육이 움직이는 원리, 운동할 때 일어나는 몸의 변화 같은 과학 지식을 알아야 합니다.',
+      inq:'운동선수의 건강 검진 자료를 분석해 알맞은 운동과 식이 요법을 제시하는 탐구 과정을 거칩니다.' },
+    { emoji:'✈️', name:'항공기 조종사',
+      know:'날씨를 표현하는 기상 요소, 항공기가 뜨는 원리, 항공기의 구조 같은 과학 지식을 알아야 합니다.',
+      inq:'승객의 안전을 고려해 기상 조건 등을 따져 최적의 항공 경로를 선택하는 탐구 과정을 거칩니다.' },
+    { emoji:'🐾', name:'반려동물 훈련 상담사',
+      know:'동물의 한살이 같은 과학 지식을 알아야 합니다.',
+      inq:'문제 행동을 보이는 반려동물의 행동을 관찰해 원인을 분석하고 적절한 훈련 방법을 안내하는 탐구 과정을 거칩니다.' },
+    { emoji:'🏗️', name:'건축가',
+      know:'건축물이 무너지지 않게 버티는 힘(구조와 하중), 재료의 성질 같은 과학 지식을 알아야 합니다.',
+      inq:'다양한 설계안을 비교해 더 안전하고 튼튼한 구조를 찾아가는 탐구 과정을 거칩니다.' },
+  ];
+
+  const grid = document.getElementById('jobGrid');
+  const placeholder = document.getElementById('placeholder');
+  const detail = document.getElementById('detail');
+  const summary = document.getElementById('summary');
+  const progressNum = document.getElementById('progressNum');
+  const progressFill = document.getElementById('progressFill');
+
+  const explored = new Set();
+
+  jobs.forEach((job, i) => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.tabIndex = 0;
+    card.setAttribute('role', 'button');
+    card.setAttribute('aria-pressed', 'false');
+    card.innerHTML = `
+      <div class="emoji">${job.emoji}</div>
+      <div class="name">${job.name}</div>
+      <div class="check" data-check></div>
+    `;
+    function activate(){
+      document.querySelectorAll('.card').forEach(c => c.classList.remove('active'));
+      card.classList.add('active');
+      document.getElementById('detEmoji').textContent = job.emoji;
+      document.getElementById('detName').textContent = job.name;
+      document.getElementById('detKnow').textContent = job.know;
+      document.getElementById('detInq').textContent = job.inq;
+      placeholder.style.display = 'none';
+      detail.classList.add('show');
+
+      if(!explored.has(i)){
+        explored.add(i);
+        card.classList.add('done');
+        card.querySelector('[data-check]').textContent = '✓ 탐색 완료';
+        updateProgress();
+      }
+    }
+    card.addEventListener('click', activate);
+    card.addEventListener('keydown', (e) => { if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); activate(); } });
+    grid.appendChild(card);
+  });
+
+  function updateProgress(){
+    const n = explored.size;
+    progressNum.textContent = `탐색한 직업 ${n} / ${jobs.length}`;
+    progressFill.style.width = (n / jobs.length * 100) + '%';
+    if(n === jobs.length){
+      summary.classList.add('show');
+    }
+  }
+})();
+</script>
+</body>
+</html>
