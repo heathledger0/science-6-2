@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI vs 사람 미래 직업 탐구 시뮬레이터</title>
+<style>
+  :root{
+    --paper:#f2efe6;
+    --panel:#fffdf8;
+    --panel-line:#e4ddc9;
+    --ink:#242019;
+    --ink-soft:#6b6355;
+    --grid-line:rgba(60,50,20,0.07);
+    --accent-sun:#c8720f;
+    --accent-sky:#2f5fa8;
+    --accent-good:#3f7d54;
+    --ai-bg:#eaf2ff;
+    --ai-ink:#1f4f8f;
+    --ai-border:#9cc3f5;
+    --human-bg:#fff2e6;
+    --human-ink:#9a4c12;
+    --human-border:#f3bf86;
+    --note-bg:#f6f2e6;
+    --lcd-bg:#20261f;
+    --lcd-text:#8ff0a4;
+    --focus:#2f5fa8;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --paper:#14120d; --panel:#1e1b14; --panel-line:#3a3427; --ink:#efe9db; --ink-soft:#b3a98f;
+      --grid-line:rgba(255,240,200,0.06); --accent-sun:#e69a2e; --accent-sky:#7fabe0; --accent-good:#6bc98a;
+      --ai-bg:#17263d; --ai-ink:#9cc3f5; --ai-border:#2f4f7f; --human-bg:#2c2013; --human-ink:#f3bf86; --human-border:#6b4a22;
+      --note-bg:#201c14; --lcd-bg:#0f1a11; --lcd-text:#8ff0a4; --focus:#7fabe0;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#14120d; --panel:#1e1b14; --panel-line:#3a3427; --ink:#efe9db; --ink-soft:#b3a98f;
+    --grid-line:rgba(255,240,200,0.06); --accent-sun:#e69a2e; --accent-sky:#7fabe0; --accent-good:#6bc98a;
+    --ai-bg:#17263d; --ai-ink:#9cc3f5; --ai-border:#2f4f7f; --human-bg:#2c2013; --human-ink:#f3bf86; --human-border:#6b4a22;
+    --note-bg:#201c14; --lcd-bg:#0f1a11; --lcd-text:#8ff0a4; --focus:#7fabe0;
+  }
+  :root[data-theme="light"]{
+    --paper:#f2efe6; --panel:#fffdf8; --panel-line:#e4ddc9; --ink:#242019; --ink-soft:#6b6355;
+    --grid-line:rgba(60,50,20,0.07); --accent-sun:#c8720f; --accent-sky:#2f5fa8; --accent-good:#3f7d54;
+    --ai-bg:#eaf2ff; --ai-ink:#1f4f8f; --ai-border:#9cc3f5; --human-bg:#fff2e6; --human-ink:#9a4c12; --human-border:#f3bf86;
+    --note-bg:#f6f2e6; --lcd-bg:#20261f; --lcd-text:#8ff0a4; --focus:#2f5fa8;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0; min-height:100%;
+    font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+    color:var(--ink);
+    background:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
+      var(--paper);
+    background-size:24px 24px, 24px 24px, auto;
+    display:flex; flex-direction:column; align-items:center;
+    padding:20px 14px 40px;
+  }
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important;} }
+
+  .nameplate{ width:100%; max-width:720px; margin-bottom:14px; }
+  .eyebrow{
+    font-family:'SFMono-Regular','Consolas',monospace; font-size:.68rem; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--ink-soft);
+  }
+  h1{ font-size:clamp(1.3rem, 1rem + 1.4vw, 1.9rem); font-weight:800; letter-spacing:-.01em; margin:2px 0 0; text-wrap:balance; }
+
+  .wrap{
+    width:100%; max-width:720px; background:var(--panel); border:1px solid var(--panel-line);
+    border-radius:18px; box-shadow:0 10px 30px rgba(30,25,10,0.10); padding:18px;
+  }
+
+  .progress-badge{ background:var(--lcd-bg); border-radius:12px; padding:10px 16px; margin-bottom:16px; }
+  .progress-badge .num{ font-family:'SFMono-Regular','Consolas',monospace; font-size:1.1rem; font-weight:700; color:var(--lcd-text); }
+  .progress-bar{ margin-top:6px; height:7px; border-radius:99px; background:rgba(255,255,255,0.1); overflow:hidden; }
+  .progress-fill{ height:100%; border-radius:99px; background:var(--lcd-text); transition:width .3s ease; }
+
+  .task-card{
+    background:var(--note-bg); border:1px solid var(--panel-line); border-radius:16px;
+    padding:22px 20px; text-align:center;
+  }
+  .task-card .task-emoji{ font-size:2.4rem; margin-bottom:8px; }
+  .task-card .task-text{ font-size:1.05rem; font-weight:700; line-height:1.5; }
+
+  .choice-row{ display:flex; gap:12px; margin-top:16px; }
+  .choice-btn{
+    flex:1; border-radius:14px; border:2px solid; padding:16px 10px; cursor:pointer;
+    font-family:inherit; font-size:.98rem; font-weight:800; display:flex; flex-direction:column; align-items:center; gap:6px;
+    transition:transform .12s ease, box-shadow .12s ease;
+  }
+  .choice-btn:hover{ transform:translateY(-2px); }
+  .choice-btn:focus-visible{ outline:2px solid var(--focus); outline-offset:2px; }
+  .choice-btn .em{ font-size:1.6rem; }
+  .choice-btn.ai{ background:var(--ai-bg); color:var(--ai-ink); border-color:var(--ai-border); }
+  .choice-btn.human{ background:var(--human-bg); color:var(--human-ink); border-color:var(--human-border); }
+  .choice-btn:disabled{ cursor:default; opacity:.55; transform:none; }
+
+  .reveal{ display:none; margin-top:16px; border-radius:14px; border:1px solid var(--panel-line); overflow:hidden; }
+  .reveal.show{ display:block; animation:fadeIn .25s ease; }
+  @keyframes fadeIn{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
+  .reveal-head{ padding:10px 16px; font-weight:800; font-size:.88rem; }
+  .reveal-head.ai{ background:var(--ai-bg); color:var(--ai-ink); }
+  .reveal-head.human{ background:var(--human-bg); color:var(--human-ink); }
+  .reveal-head.both{ background:linear-gradient(90deg, var(--ai-bg), var(--human-bg)); color:var(--ink); }
+  .reveal-body{ padding:14px 16px; font-size:.92rem; line-height:1.6; background:var(--panel); }
+
+  .next-btn{
+    margin-top:16px; width:100%; padding:13px; border-radius:12px; border:none;
+    background:var(--accent-sky); color:#fff; font-family:inherit; font-weight:800; font-size:.95rem;
+    cursor:pointer; display:none;
+  }
+  .next-btn.show{ display:block; }
+  .next-btn:focus-visible{ outline:2px solid var(--focus); outline-offset:2px; }
+
+  .summary{ display:none; }
+  .summary.show{ display:block; animation:fadeIn .3s ease; }
+  .summary .big{ font-size:1.2rem; font-weight:800; text-align:center; margin-bottom:10px; }
+  .summary p{ line-height:1.65; font-size:.94rem; margin:10px 0; }
+  .job-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(140px,1fr)); gap:10px; margin-top:14px; }
+  .job-card{ background:var(--note-bg); border:1px solid var(--panel-line); border-radius:12px; padding:12px 10px; text-align:center; }
+  .job-card .em{ font-size:1.6rem; }
+  .job-card .nm{ font-weight:800; font-size:.88rem; margin-top:4px; }
+  .job-card .ds{ font-size:.76rem; color:var(--ink-soft); margin-top:4px; line-height:1.4; }
+  .restart-btn{
+    margin-top:18px; width:100%; padding:12px; border-radius:12px; border:1px solid var(--panel-line);
+    background:var(--panel); color:var(--ink); font-family:inherit; font-weight:700; cursor:pointer;
+  }
+
+  .note{ margin-top:16px; font-size:.85rem; color:var(--ink); background:var(--paper); border:1px dashed var(--panel-line); border-radius:10px; padding:12px 14px; line-height:1.55; }
+  .note b{ color:var(--accent-sun); }
+</style>
+</head>
+<body>
+  <div class="nameplate">
+    <div class="eyebrow">SCIENCE LAB INSTRUMENT · 6학년 2학기 4단원 과학과 나의 진로 (10~11차시)</div>
+    <h1>🤖 AI vs 사람, 이 일은 누가 더 잘할까?</h1>
+  </div>
+
+  <div class="wrap">
+    <div id="quizSection">
+      <div class="progress-badge">
+        <div class="num" id="progressNum">업무 카드 1 / 8</div>
+        <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:12.5%"></div></div>
+      </div>
+
+      <div class="task-card">
+        <div class="task-emoji" id="taskEmoji">🏥</div>
+        <div class="task-text" id="taskText"></div>
+      </div>
+
+      <div class="choice-row">
+        <button class="choice-btn ai" id="btnAi">
+          <span class="em">🤖</span>
+          <span>인공지능이 더 잘해요</span>
+        </button>
+        <button class="choice-btn human" id="btnHuman">
+          <span class="em">🧑</span>
+          <span>사람이 더 잘해요</span>
+        </button>
+      </div>
+
+      <div class="reveal" id="reveal">
+        <div class="reveal-head" id="revealHead"></div>
+        <div class="reveal-body" id="revealBody"></div>
+      </div>
+
+      <button class="next-btn" id="nextBtn">다음 업무 카드 →</button>
+    </div>
+
+    <div class="summary" id="summary">
+      <div class="big">🎉 8개 업무를 모두 살펴봤어요!</div>
+      <p>인공지능은 <b>많은 자료를 빠르게 분석하고 반복적인 일을 자동화</b>하는 것을 잘하고,
+      사람은 <b>공감하고, 현장 상황에 유연하게 대응하고, 창의적으로 판단</b>하는 것을 잘해요.
+      그래서 인공지능이 발전할수록 일자리가 통째로 사라지기보다, <b>인공지능과 협업하는 새로운 직업</b>이 계속 생겨나고 있어요.</p>
+
+      <div class="job-grid">
+        <div class="job-card"><div class="em">📊</div><div class="nm">데이터 과학자</div><div class="ds">데이터를 수집·분석해 의미 있는 결론을 끌어내요</div></div>
+        <div class="job-card"><div class="em">🧠</div><div class="nm">인공지능 연구원</div><div class="ds">인공지능이 스스로 학습하고 추론하는 기술을 개발해요</div></div>
+        <div class="job-card"><div class="em">🔒</div><div class="nm">정보 보안 전문가</div><div class="ds">해킹 등 위협으로부터 컴퓨터 시스템을 보호해요</div></div>
+        <div class="job-card"><div class="em">🦾</div><div class="nm">로봇 공학자</div><div class="ds">사람을 대신할 로봇의 부품과 장치를 연구·개발해요</div></div>
+      </div>
+
+      <p>💬 <b>중요한 건 두려움이 아니라 준비예요.</b> 인공지능의 발전은 막연히 무서워할 대상이 아니라, 어떻게 협업하고 적응할지 생각해 볼 변화예요.</p>
+
+      <button class="restart-btn" id="restartBtn">🔄 처음부터 다시 해 보기</button>
+    </div>
+
+    <div class="note">
+      💡 <b>활용 팁</b>: 정답을 딱 하나로 정하기보다, 먼저 모둠에서 "AI일까 사람일까"를 예측하고 선택한 뒤 전문가의 생각을 함께 읽어 보세요.
+      실제로는 둘 다 필요한 경우도 많아요 — 이 활동의 목적은 정답 맞히기가 아니라, <b>인공지능과 사람이 각각 무엇을 더 잘하는지</b> 생각해 보는 것입니다.
+    </div>
+  </div>
+
+<script>
+(function(){
+  const tasks = [
+    { emoji:'🏥', text:'의료 영상 수만 장에서 질병의 작은 징후를 빠르게 찾아내기',
+      answer:'ai', headLabel:'🤖 인공지능이 더 잘해요',
+      body:'인공지능은 수많은 자료를 지치지 않고 빠르게 분석할 수 있어요. 의료 분야에서는 환자의 의료 기록을 분석해 질병을 조기에 발견하고 예방하는 데 활용되고 있어요.' },
+    { emoji:'🛍️', text:'인터넷 쇼핑몰에서 고객의 구매 기록을 분석해 어울리는 상품 추천하기',
+      answer:'ai', headLabel:'🤖 인공지능이 더 잘해요',
+      body:'인터넷을 통해 물건을 살 때, 인공지능이 고객의 구매 내역을 분석해 맞춤형 상품을 추천해 줘요. 이렇게 인공지능은 자료를 빠르게 수집하고 분석해 업무를 자동화해요.' },
+    { emoji:'😢', text:'슬퍼하는 친구의 이야기를 들어주고 마음을 공감하며 위로하기',
+      answer:'human', headLabel:'🧑 사람이 더 잘해요',
+      body:'다른 사람의 감정을 진심으로 이해하고 따뜻하게 공감하는 것은 아직 사람이 훨씬 더 잘하는 일이에요. 상담, 돌봄처럼 마음을 나누는 일은 사람의 역할이 큽니다.' },
+    { emoji:'🚒', text:'화재 현장에서 상황을 순간순간 판단해 유연하게 대응하기',
+      answer:'human', headLabel:'🧑 사람이 더 잘해요',
+      body:'예상하지 못한 돌발 상황에서 현장을 직접 살피고 임기응변으로 판단해 행동하는 것은 사람이 더 잘하는 영역이에요. 다만 인공지능이 화재 감지나 경로 분석으로 소방관을 돕기도 해요.' },
+    { emoji:'📚', text:'많은 양의 자료를 짧은 시간 안에 종합하고 요약하기',
+      answer:'ai', headLabel:'🤖 인공지능이 더 잘해요',
+      body:'교과서에도 나오는 예시예요 — "많은 양의 자료를 종합하고 요약할 때 인공지능을 활용해 시간을 절약하고, 나는 더 창의적인 업무에 집중할 수 있다." 인공지능과 협업하면 시간을 아낄 수 있어요.' },
+    { emoji:'🎨', text:'아무도 생각하지 못한 완전히 새로운 이야기나 디자인을 상상해 만들기',
+      answer:'human', headLabel:'🧑 사람이 더 잘해요(아직은요!)',
+      body:'새로운 아이디어를 떠올리고 의미를 부여하는 창의적 상상력은 사람의 강점이에요. 다만 최근에는 인공지능도 그림이나 글을 만드는 데 도움을 주고 있어서, 앞으로는 사람과 인공지능이 함께 창작하는 경우도 많아질 거예요.' },
+    { emoji:'🔐', text:'해킹이나 악성 소프트웨어로부터 컴퓨터 시스템을 지키는 보안 시스템 설계하기',
+      answer:'human', headLabel:'🧑 사람(정보 보안 전문가)이 필요해요',
+      body:'이 업무를 전문적으로 하는 정보 보안 전문가라는 직업이 바로 인공지능 발전과 함께 새롭게 떠오른 직업이에요! 보안 시스템을 설계하는 사람의 판단력에, 이상 신호를 빠르게 찾아내는 인공지능이 힘을 보태요.' },
+    { emoji:'🤝', text:'환자에게 수술 결과를 설명하고, 환자가 불안해하지 않도록 안심시키기',
+      answer:'human', headLabel:'🧑 사람이 더 잘해요',
+      body:'정보를 정확히 전달하는 것을 넘어, 상대의 감정을 살피며 신뢰를 쌓는 소통은 사람 고유의 역할이에요. 의료 영상 분석 같은 반복적 분석은 인공지능이 돕고, 사람은 환자와의 소통에 집중할 수 있어요.' },
+  ];
+
+  let idx = 0;
+  let answered = false;
+
+  const progressNum = document.getElementById('progressNum');
+  const progressFill = document.getElementById('progressFill');
+  const taskEmoji = document.getElementById('taskEmoji');
+  const taskText = document.getElementById('taskText');
+  const btnAi = document.getElementById('btnAi');
+  const btnHuman = document.getElementById('btnHuman');
+  const reveal = document.getElementById('reveal');
+  const revealHead = document.getElementById('revealHead');
+  const revealBody = document.getElementById('revealBody');
+  const nextBtn = document.getElementById('nextBtn');
+  const quizSection = document.getElementById('quizSection');
+  const summary = document.getElementById('summary');
+  const restartBtn = document.getElementById('restartBtn');
+
+  function renderTask(){
+    const t = tasks[idx];
+    progressNum.textContent = `업무 카드 ${idx+1} / ${tasks.length}`;
+    progressFill.style.width = ((idx+1)/tasks.length*100) + '%';
+    taskEmoji.textContent = t.emoji;
+    taskText.textContent = t.text;
+    reveal.classList.remove('show');
+    nextBtn.classList.remove('show');
+    btnAi.disabled = false;
+    btnHuman.disabled = false;
+    answered = false;
+  }
+
+  function choose(choice){
+    if(answered) return;
+    answered = true;
+    btnAi.disabled = true;
+    btnHuman.disabled = true;
+    const t = tasks[idx];
+    revealHead.textContent = t.headLabel;
+    revealHead.className = 'reveal-head ' + (t.answer === 'ai' ? 'ai' : 'human');
+    revealBody.textContent = t.body;
+    reveal.classList.add('show');
+    nextBtn.classList.add('show');
+  }
+
+  btnAi.addEventListener('click', () => choose('ai'));
+  btnHuman.addEventListener('click', () => choose('human'));
+
+  nextBtn.addEventListener('click', () => {
+    idx++;
+    if(idx >= tasks.length){
+      quizSection.style.display = 'none';
+      summary.classList.add('show');
+    } else {
+      renderTask();
+    }
+  });
+
+  restartBtn.addEventListener('click', () => {
+    idx = 0;
+    summary.classList.remove('show');
+    quizSection.style.display = 'block';
+    renderTask();
+  });
+
+  renderTask();
+})();
+</script>
+</body>
+</html>
