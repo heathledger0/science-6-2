@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>미래 도시 설계 시뮬레이터</title>
+<style>
+  :root{
+    --paper:#f2efe6; --panel:#fffdf8; --panel-line:#e4ddc9; --ink:#242019; --ink-soft:#6b6355;
+    --grid-line:rgba(60,50,20,0.07); --accent-sun:#c8720f; --accent-sky:#2f5fa8; --accent-good:#3f7d54;
+    --chip-bg:#f6f2e6; --chip-border:#d8cfb4; --chip-sel-bg:#3f7d54; --chip-sel-ink:#ffffff;
+    --warn-bg:#fff2e0; --warn-border:#e3a856; --warn-ink:#8a5a12;
+    --lcd-bg:#20261f; --lcd-text:#8ff0a4; --focus:#2f5fa8;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --paper:#14120d; --panel:#1e1b14; --panel-line:#3a3427; --ink:#efe9db; --ink-soft:#b3a98f;
+      --grid-line:rgba(255,240,200,0.06); --accent-sun:#e69a2e; --accent-sky:#7fabe0; --accent-good:#6bc98a;
+      --chip-bg:#201c14; --chip-border:#4a4230; --chip-sel-bg:#3f7d54; --chip-sel-ink:#ffffff;
+      --warn-bg:#2c2013; --warn-border:#8a5a12; --warn-ink:#f0c27a;
+      --lcd-bg:#0f1a11; --lcd-text:#8ff0a4; --focus:#7fabe0;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#14120d; --panel:#1e1b14; --panel-line:#3a3427; --ink:#efe9db; --ink-soft:#b3a98f;
+    --grid-line:rgba(255,240,200,0.06); --accent-sun:#e69a2e; --accent-sky:#7fabe0; --accent-good:#6bc98a;
+    --chip-bg:#201c14; --chip-border:#4a4230; --chip-sel-bg:#3f7d54; --chip-sel-ink:#ffffff;
+    --warn-bg:#2c2013; --warn-border:#8a5a12; --warn-ink:#f0c27a;
+    --lcd-bg:#0f1a11; --lcd-text:#8ff0a4; --focus:#7fabe0;
+  }
+  :root[data-theme="light"]{
+    --paper:#f2efe6; --panel:#fffdf8; --panel-line:#e4ddc9; --ink:#242019; --ink-soft:#6b6355;
+    --grid-line:rgba(60,50,20,0.07); --accent-sun:#c8720f; --accent-sky:#2f5fa8; --accent-good:#3f7d54;
+    --chip-bg:#f6f2e6; --chip-border:#d8cfb4; --chip-sel-bg:#3f7d54; --chip-sel-ink:#ffffff;
+    --warn-bg:#fff2e0; --warn-border:#e3a856; --warn-ink:#8a5a12;
+    --lcd-bg:#20261f; --lcd-text:#8ff0a4; --focus:#2f5fa8;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0; min-height:100%; font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+    color:var(--ink);
+    background:linear-gradient(var(--grid-line) 1px, transparent 1px),linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),var(--paper);
+    background-size:24px 24px, 24px 24px, auto;
+    display:flex; flex-direction:column; align-items:center; padding:20px 14px 40px;
+  }
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important;} }
+  .nameplate{ width:100%; max-width:760px; margin-bottom:14px; }
+  .eyebrow{ font-family:'SFMono-Regular','Consolas',monospace; font-size:.68rem; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-soft); }
+  h1{ font-size:clamp(1.25rem, 1rem + 1.2vw, 1.8rem); font-weight:800; letter-spacing:-.01em; margin:2px 0 0; text-wrap:balance; }
+  .wrap{ width:100%; max-width:760px; background:var(--panel); border:1px solid var(--panel-line); border-radius:18px; box-shadow:0 10px 30px rgba(30,25,10,0.10); padding:18px; }
+
+  .screen{ position:relative; border-radius:14px; padding:8px; background:linear-gradient(155deg, #d9d2bd, #c7bfa4); box-shadow:inset 0 0 0 1px rgba(0,0,0,0.15); }
+  @media (prefers-color-scheme: dark){ .screen{ background:linear-gradient(155deg, #34301f, #221f16); } }
+  :root[data-theme="dark"] .screen{ background:linear-gradient(155deg, #34301f, #221f16); }
+  :root[data-theme="light"] .screen{ background:linear-gradient(155deg, #d9d2bd, #c7bfa4); }
+  canvas{ width:100%; aspect-ratio:4/3; border-radius:9px; display:block; }
+
+  .progress-row{ margin-top:14px; background:var(--lcd-bg); border-radius:12px; padding:12px 16px; }
+  .progress-row .num{ font-family:'SFMono-Regular','Consolas',monospace; font-size:1.05rem; font-weight:700; color:var(--lcd-text); }
+  .progress-bar{ margin-top:8px; height:7px; border-radius:99px; background:rgba(255,255,255,0.1); overflow:hidden; }
+  .progress-fill{ height:100%; border-radius:99px; background:var(--lcd-text); transition:width .3s ease; }
+
+  .section-label{ font-size:.78rem; font-weight:800; color:var(--accent-sun); letter-spacing:.03em; margin:16px 0 8px; }
+  .chips{ display:flex; flex-wrap:wrap; gap:8px; }
+  .chip{
+    border:1px solid var(--chip-border); background:var(--chip-bg); color:var(--ink);
+    border-radius:12px; padding:10px 14px; font-size:.86rem; font-weight:700; cursor:pointer;
+    font-family:inherit; display:flex; align-items:center; gap:6px; transition:background .15s ease, color .15s ease, transform .1s ease;
+  }
+  .chip:hover{ transform:translateY(-1px); }
+  .chip:focus-visible{ outline:2px solid var(--focus); outline-offset:2px; }
+  .chip.sel{ background:var(--chip-sel-bg); color:var(--chip-sel-ink); border-color:var(--chip-sel-bg); }
+  .chip .tag{ font-size:.68rem; opacity:.85; }
+
+  .warn{
+    display:none; margin-top:16px; background:var(--warn-bg); border:1px solid var(--warn-border); color:var(--warn-ink);
+    border-radius:12px; padding:14px 16px; font-size:.9rem; line-height:1.6;
+  }
+  .warn.show{ display:block; animation:fadeIn .3s ease; }
+  @keyframes fadeIn{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
+  .warn b{ color:var(--accent-sun); }
+
+  .note{ margin-top:16px; font-size:.85rem; color:var(--ink); background:var(--paper); border:1px dashed var(--panel-line); border-radius:10px; padding:12px 14px; line-height:1.55; }
+  .note b{ color:var(--accent-sun); }
+</style>
+</head>
+<body>
+  <div class="nameplate">
+    <div class="eyebrow">SCIENCE LAB INSTRUMENT · 6학년 2학기 4단원 과학과 나의 진로 (3~4차시)</div>
+    <h1>🏙️ 30년 뒤 미래 도시 설계 시뮬레이터</h1>
+  </div>
+
+  <div class="wrap">
+    <div class="screen">
+      <canvas id="stage" width="900" height="675"></canvas>
+    </div>
+
+    <div class="progress-row">
+      <div class="num" id="progressNum">적용한 과학 기술 0 / 5</div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+    </div>
+
+    <div class="section-label">🌍 환경 문제를 해결하는 기술</div>
+    <div class="chips" id="chipsEnv"></div>
+
+    <div class="section-label">👨‍👩‍👧‍👦 인구 문제를 해결하는 기술</div>
+    <div class="chips" id="chipsPop"></div>
+
+    <div class="section-label">⚖️ 윤리 문제를 해결하는 기술</div>
+    <div class="chips" id="chipsEth"></div>
+
+    <div class="warn" id="warnBox">
+      ⚠️ <b>잠깐, 생각해 볼까요?</b> 과학 기술로 우리 도시의 환경·인구·윤리 문제에 많은 도움을 줄 수 있었어요.
+      하지만 이것으로 <b>모든 문제가 완전히 해결되었다고 할 수 있을까요?</b> 사람들 사이의 믿음, 배려하는 마음,
+      서로 다른 의견을 조율하는 것처럼 <b>과학 기술만으로는 해결하기 어려운 문제</b>도 분명히 있어요.
+      이렇게 "과학이 모든 문제를 해결할 수 있다"고 믿는 생각을 <b>과학만능주의</b>라고 해요 — 과학은 중요한
+      역할을 하지만, 다양한 측면에서 함께 고민해야 진짜 문제를 해결할 수 있답니다.
+    </div>
+
+    <div class="note">
+      💡 <b>활용 팁</b>: 버튼을 눌러 우리 도시에 과학 기술을 하나씩 적용해 보세요. 5개를 모두 적용하면
+      "이걸로 충분할까?"라는 질문이 함께 나타나요. 모둠 토의 전 동기 유발용으로, 또는 직소 토의 후
+      정리 활동으로 활용하면 좋습니다.
+    </div>
+  </div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('stage');
+  const ctx = canvas.getContext('2d');
+  let W = 900, H = 675;
+
+  function resizeCanvas(){
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    W = rect.width; H = rect.height;
+    canvas.width = Math.max(1, Math.round(W*dpr));
+    canvas.height = Math.max(1, Math.round(H*dpr));
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  const items = [
+    { id:'solar', label:'태양광 지붕', tag:'환경', group:'env', emoji:'☀️' },
+    { id:'wind', label:'풍력 발전기', tag:'환경', group:'env', emoji:'💨' },
+    { id:'forest', label:'도시 숲', tag:'환경', group:'env', emoji:'🌳' },
+    { id:'robot', label:'로봇 자동화 공장', tag:'인구', group:'pop', emoji:'🤖' },
+    { id:'security', label:'정보 보안 센터', tag:'윤리', group:'eth', emoji:'🔒' },
+  ];
+  const state = {};
+  items.forEach(i => state[i.id] = false);
+
+  const chipsEnv = document.getElementById('chipsEnv');
+  const chipsPop = document.getElementById('chipsPop');
+  const chipsEth = document.getElementById('chipsEth');
+  const progressNum = document.getElementById('progressNum');
+  const progressFill = document.getElementById('progressFill');
+  const warnBox = document.getElementById('warnBox');
+
+  items.forEach(item => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'chip';
+    chip.innerHTML = `<span>${item.emoji}</span><span>${item.label}</span><span class="tag">#${item.tag}</span>`;
+    chip.setAttribute('aria-pressed', 'false');
+    chip.addEventListener('click', () => {
+      state[item.id] = !state[item.id];
+      chip.classList.toggle('sel', state[item.id]);
+      chip.setAttribute('aria-pressed', String(state[item.id]));
+      render();
+    });
+    (item.group === 'env' ? chipsEnv : item.group === 'pop' ? chipsPop : chipsEth).appendChild(chip);
+  });
+
+  function drawCity(){
+    ctx.clearRect(0,0,W,H);
+    const skyGrad = ctx.createLinearGradient(0,0,0,H*0.62);
+    skyGrad.addColorStop(0, '#bfe0f7');
+    skyGrad.addColorStop(1, '#eaf5fb');
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0,0,W,H*0.64);
+
+    ctx.fillStyle = '#d8cf9e';
+    ctx.fillRect(0, H*0.62, W, H*0.38);
+
+    // 해
+    ctx.fillStyle = '#f4c968';
+    ctx.beginPath(); ctx.arc(W*0.86, H*0.14, W*0.045, 0, Math.PI*2); ctx.fill();
+
+    // 풍력 발전기(배경, 토글)
+    if(state.wind){
+      [0.1, 0.18].forEach((px, i) => {
+        const bx = W*px, by = H*0.58, bladeLen = W*0.055;
+        ctx.strokeStyle = '#8a8578';
+        ctx.lineWidth = Math.max(2, W*0.007);
+        ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx, by-H*0.26); ctx.stroke();
+        ctx.save();
+        ctx.translate(bx, by-H*0.26);
+        ctx.rotate((i*0.5) + 0.3);
+        ctx.strokeStyle = '#f5f5f0';
+        ctx.lineWidth = Math.max(2.5, W*0.009);
+        for(let k=0;k<3;k++){
+          ctx.save();
+          ctx.rotate(k*2.094);
+          ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(0,-bladeLen); ctx.stroke();
+          ctx.restore();
+        }
+        ctx.restore();
+      });
+    }
+
+    // 도시 숲(토글)
+    if(state.forest){
+      [0.04,0.08,0.92,0.96].forEach(px => {
+        const tx = W*px, ty = H*0.64;
+        ctx.fillStyle = '#4a8a5c';
+        for(let s=0;s<3;s++){
+          const segH = H*0.05, segY = ty - s*segH*0.6, segW = W*0.028*(1-s*0.2);
+          ctx.beginPath();
+          ctx.moveTo(tx, segY-segH); ctx.lineTo(tx-segW, segY); ctx.lineTo(tx+segW, segY); ctx.closePath(); ctx.fill();
+        }
+      });
+    }
+
+    // 집 3채(기본)
+    const houseXs = [0.28, 0.46, 0.64];
+    houseXs.forEach((px, i) => {
+      const hx = W*px, hw = W*0.14, hh = H*0.16, hy = H*0.62-hh;
+      ctx.fillStyle = '#f2ebd8';
+      ctx.fillRect(hx, hy, hw, hh);
+      ctx.fillStyle = '#9a7a4a';
+      ctx.beginPath(); ctx.moveTo(hx-W*0.012, hy); ctx.lineTo(hx+hw/2, hy-H*0.06); ctx.lineTo(hx+hw+W*0.012, hy); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#bfe3ff';
+      ctx.fillRect(hx+hw*0.18, hy+hh*0.3, hw*0.22, hh*0.3);
+      ctx.fillRect(hx+hw*0.6, hy+hh*0.3, hw*0.22, hh*0.3);
+
+      // 태양광 지붕(토글)
+      if(state.solar){
+        ctx.fillStyle = '#2f5fa8';
+        const px0 = hx-W*0.005, py0 = hy-H*0.045;
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(px0, py0+H*0.012);
+        ctx.lineTo(hx+hw/2, hy-H*0.05);
+        ctx.lineTo(hx+hw+W*0.005, py0+H*0.012);
+        ctx.lineTo(hx+hw*0.82, hy-H*0.005);
+        ctx.lineTo(hx+hw*0.18, hy-H*0.005);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+    });
+
+    // 로봇 자동화 공장(토글)
+    if(state.robot){
+      const fx = W*0.1, fy = H*0.62-H*0.2, fw = W*0.14, fh = H*0.2;
+      ctx.fillStyle = '#c9c2ac';
+      ctx.fillRect(fx, fy, fw, fh);
+      ctx.fillStyle = '#8a8578';
+      ctx.fillRect(fx+fw*0.1, fy-H*0.05, fw*0.14, H*0.05);
+      ctx.beginPath(); ctx.arc(fx+fw*0.17, fy-H*0.055, W*0.012, 0, Math.PI*2); ctx.fillStyle='#d9432b'; ctx.fill();
+      ctx.font = 'bold ' + (W*0.05).toFixed(1) + 'px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('🤖', fx+fw/2, fy+fh*0.65);
+    }
+
+    // 정보 보안 센터(토글)
+    if(state.security){
+      const sx = W*0.78, sy = H*0.62-H*0.17, sw = W*0.14, sh = H*0.17;
+      ctx.fillStyle = '#e3e8f0';
+      ctx.fillRect(sx, sy, sw, sh);
+      ctx.strokeStyle = '#2f5fa8';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(sx, sy, sw, sh);
+      ctx.font = 'bold ' + (W*0.05).toFixed(1) + 'px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('🔒', sx+sw/2, sy+sh*0.65);
+    }
+
+    ctx.fillStyle = '#3a3226';
+    ctx.font = 'bold ' + (W*0.04).toFixed(1) + 'px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('우리가 설계하는 30년 뒤 미래 도시', W/2, H*0.1);
+  }
+
+  function render(){
+    drawCity();
+    const n = items.filter(i => state[i.id]).length;
+    progressNum.textContent = `적용한 과학 기술 ${n} / ${items.length}`;
+    progressFill.style.width = (n/items.length*100) + '%';
+    warnBox.classList.toggle('show', n === items.length);
+  }
+
+  let resizeTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => { resizeCanvas(); render(); }, 80);
+  });
+
+  resizeCanvas();
+  render();
+})();
+</script>
+</body>
+</html>
