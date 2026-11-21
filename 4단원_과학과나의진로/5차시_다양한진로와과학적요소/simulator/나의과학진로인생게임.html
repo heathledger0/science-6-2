@@ -86,26 +86,38 @@
   .dogam-cell img{ width:100%; height:60%; object-fit:cover; border-radius:8px; }
   .dogam-cell .nm{ font-size:.66rem; font-weight:800; margin-top:3px; line-height:1.2; }
 
-  /* ---- mystery / guess screen ---- */
+  /* ---- case / predict / quiz screens ---- */
   .job-head{ display:flex; align-items:center; gap:14px; margin-bottom:14px; }
   .job-head img{ width:84px; height:84px; object-fit:cover; border-radius:14px; border:1px solid var(--panel-line); }
   .job-head h2{ margin:0; font-size:1.2rem; }
   .job-head .sub{ font-size:.82rem; color:var(--ink-soft); margin-top:2px; }
 
-  .mystery-badge{ text-align:center; font-size:3rem; margin-bottom:6px; }
+  .case-badge{ text-align:center; font-size:3rem; margin-bottom:6px; }
   .task-card{ background:var(--paper); border:1px solid var(--panel-line); border-radius:16px; padding:22px 18px; text-align:center; }
   .task-card .lab{ font-size:.78rem; font-weight:800; color:var(--accent-sun); margin-bottom:8px; }
   .task-card p{ font-size:1.02rem; font-weight:700; line-height:1.55; margin:0; }
 
-  .choice-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:16px; }
+  .predict-box{ margin-top:16px; }
+  .predict-box label{ display:block; font-size:.84rem; font-weight:800; color:var(--ink-soft); margin-bottom:6px; }
+  .predict-box textarea{
+    width:100%; min-height:84px; border-radius:12px; border:1px solid var(--panel-line); background:var(--choice-bg);
+    color:var(--ink); font-family:inherit; font-size:.92rem; line-height:1.5; padding:12px; resize:vertical;
+  }
+  .predict-box textarea:focus-visible{ outline:2px solid var(--focus); outline-offset:1px; }
+  .predict-hint{ font-size:.8rem; color:var(--ink-soft); margin-top:6px; }
+
+  .quiz-prompt{ font-weight:800; font-size:1rem; text-align:center; margin-bottom:14px; line-height:1.5; }
+  .quiz-step{ text-align:center; font-size:.78rem; font-weight:800; color:var(--accent-sun); margin-bottom:4px; }
+
+  .choice-grid{ display:grid; grid-template-columns:1fr; gap:10px; margin-top:16px; }
   .choice-opt{
     border:2px solid var(--panel-line); background:var(--choice-bg); color:var(--ink);
-    border-radius:14px; padding:14px 8px; cursor:pointer; font-family:inherit; font-size:.92rem; font-weight:800;
-    display:flex; flex-direction:column; align-items:center; gap:4px;
+    border-radius:14px; padding:13px 14px; cursor:pointer; font-family:inherit; font-size:.9rem; font-weight:700;
+    display:flex; align-items:center; gap:8px; text-align:left; line-height:1.4;
   }
-  .choice-opt .em{ font-size:1.4rem; }
+  .choice-opt .em{ font-size:1.2rem; flex-shrink:0; }
   .choice-opt:focus-visible{ outline:2px solid var(--focus); outline-offset:2px; }
-  .choice-opt:disabled{ opacity:.5; cursor:not-allowed; }
+  .choice-opt:disabled{ opacity:.6; cursor:not-allowed; }
   .choice-opt.correct{ border-color:var(--accent-good); background:var(--inq-bg); color:var(--inq-ink); }
   .choice-opt.wrong{ border-color:var(--accent-bad); background:#fdeceb; color:var(--accent-bad); }
 
@@ -118,6 +130,8 @@
   .reveal-head{ padding:10px 16px; font-weight:800; font-size:.86rem; }
   .reveal-head.know{ background:var(--know-bg); color:var(--know-ink); }
   .reveal-head.inq{ background:var(--inq-bg); color:var(--inq-ink); }
+  .reveal-head.wrong{ background:#fdeceb; color:var(--accent-bad); }
+  .reveal-head.predict{ background:var(--lock-bg); color:var(--ink); }
   .reveal-body{ padding:14px 16px; font-size:.92rem; line-height:1.6; background:var(--panel); }
 
   .new-badge{ display:inline-block; background:var(--accent-sun); color:#fff; font-size:.72rem; font-weight:800; padding:3px 10px; border-radius:999px; margin-bottom:8px; }
@@ -159,9 +173,9 @@
       <div class="intro">
         <img class="mascot" src="assets/mascot.webp" alt="꿈돌이">
         <h2 style="margin:0;font-size:1.1rem;">안녕, 난 "꿈돌이"야!</h2>
-        <p>미스터리 사건 카드를 뽑으면 어떤 직업 이야기인지 맞혀야 해. 정답을 확인하면 그 상황에 필요한
-        <b>과학 지식</b>과 <b>과학적 탐구 과정</b>을 둘 다 알려줄게. 25개 직업을 모두 맞혀서 나만의 직업도감을 완성해 보자!
-        모둠 친구들과 함께 뽑으면서 도감을 채워도 좋아.</p>
+        <p>사건 카드를 뽑으면 어떤 직업이 겪는 상황인지 보여줄게. 먼저 너의 생각대로 <b>과학 지식</b>과 <b>과학적 탐구 과정</b>을
+        예측해 보고, 보기 중에서 골라서 맞는지 확인해 봐! 25개 직업을 모두 모아서 나만의 직업도감을 완성해 보자!
+        모둠 친구들과 함께 의논하면서 채워도 좋아.</p>
         <button class="big-btn" id="btnStart">도감 열기 →</button>
       </div>
     </div>
@@ -173,23 +187,59 @@
         <div class="progress-chip" id="progressChip">0 / 25</div>
       </div>
       <div class="draw-btn-row">
-        <button class="big-btn" id="btnDraw">🎴 미스터리 사건 카드 뽑기</button>
+        <button class="big-btn" id="btnDraw">🎴 사건 카드 뽑기</button>
       </div>
       <div class="dogam-grid" id="dogamGrid"></div>
       <div class="mascot-note">
         <img src="assets/mascot.webp" alt="꿈돌이">
-        <p>위 버튼을 눌러서 사건 카드를 뽑아 봐. 어떤 직업 이야기인지 맞히면 도감이 채워져! 이미 채운 직업 칸을 누르면 도감 카드를 다시 볼 수 있어.</p>
+        <p>위 버튼을 눌러서 사건 카드를 뽑아 봐. 직업의 상황을 보고 과학 지식과 탐구 과정을 맞히면 도감이 채워져! 이미 채운 직업 칸을 누르면 도감 카드를 다시 볼 수 있어.</p>
       </div>
     </div>
 
-    <!-- 장면 2: 미스터리 사건 - 직업 맞히기 -->
-    <div class="scene" id="sceneGuess">
-      <div class="mystery-badge">🕵️</div>
+    <!-- 장면 2: 사건 카드 (직업 공개) -->
+    <div class="scene" id="sceneCase">
+      <div class="case-badge">📋</div>
+      <div class="job-head" id="caseJobHead">
+        <img id="caseImg" src="" alt="">
+        <div>
+          <h2 id="caseName" style="font-size:1.05rem;"></h2>
+          <div class="sub">사건 발생!</div>
+        </div>
+      </div>
       <div class="task-card">
-        <div class="lab">미스터리 사건</div>
+        <div class="lab">상황</div>
         <p id="situationText"></p>
       </div>
+      <div class="btn-row">
+        <button class="primary" id="btnCaseNext" style="flex:1 1 100%;">내 예측 적어보기 →</button>
+      </div>
+    </div>
+
+    <!-- 장면 2-1: 예측 적기(POE) -->
+    <div class="scene" id="scenePredict">
+      <div class="task-card" style="margin-bottom:4px;">
+        <div class="lab">상황 다시 보기</div>
+        <p id="predictSituationText" style="font-size:.9rem;"></p>
+      </div>
+      <div class="predict-box">
+        <label for="predictInput">✏️ 이 상황에는 어떤 과학 지식과 탐구 과정이 필요할까요? 모둠과 의논해서 적어 보세요.</label>
+        <textarea id="predictInput" placeholder="예: ○○에 대해 알아야 하고, △△하는 과정이 필요할 것 같다..."></textarea>
+        <div class="predict-hint">적지 않고 넘어가도 괜찮아요. 적어두면 나중에 정답과 비교해 볼 수 있어요.</div>
+      </div>
+      <div class="btn-row">
+        <button class="primary" id="btnPredictNext" style="flex:1 1 100%;">보기 확인하러 가기 →</button>
+      </div>
+    </div>
+
+    <!-- 장면 2-2: 지식/탐구과정 선택 퀴즈 (공용) -->
+    <div class="scene" id="sceneQuiz">
+      <div class="quiz-step" id="quizStep"></div>
+      <div class="quiz-prompt" id="quizPrompt"></div>
       <div class="choice-grid" id="choiceGrid"></div>
+      <div id="quizExplain"></div>
+      <div class="btn-row" id="quizNextRow" style="display:none;">
+        <button class="primary" id="quizNextBtn" style="flex:1 1 100%;"></button>
+      </div>
     </div>
 
     <!-- 장면 3: 결과 확인 -->
@@ -201,6 +251,10 @@
           <h2 id="revealName" style="font-size:1.05rem;"></h2>
           <div class="sub" id="newBadgeWrap"><span class="new-badge" id="newBadge" style="display:none;">🆕 도감 등록!</span></div>
         </div>
+      </div>
+      <div class="reveal-box" id="predictRecapBox" style="display:none;">
+        <div class="reveal-head predict">✏️ 내가 적은 예측</div>
+        <div class="reveal-body" id="predictRecap"></div>
       </div>
       <div class="reveal-box">
         <div class="reveal-head know">🧪 이 상황에 필요한 과학 지식</div>
@@ -559,11 +613,15 @@
   }
 
   let currentCard = null;
+  let currentPrediction = '';
+  let quizResults = { know:false, inquiry:false };
 
   const scenes = {
     intro: document.getElementById('sceneIntro'),
     dogam: document.getElementById('sceneDogam'),
-    guess: document.getElementById('sceneGuess'),
+    case: document.getElementById('sceneCase'),
+    predict: document.getElementById('scenePredict'),
+    quiz: document.getElementById('sceneQuiz'),
     reveal: document.getElementById('sceneReveal'),
     summary: document.getElementById('sceneSummary'),
   };
@@ -594,57 +652,118 @@
     document.getElementById('progressChip').textContent = `${done.size} / ${JOBS.length}`;
   }
 
-  function pickDistractors(correctId, n){
-    const pool = JOBS.filter(j => j.id !== correctId).map(j => j.id);
-    const picked = [];
-    while(picked.length < n && pool.length){
-      const idx = Math.floor(Math.random() * pool.length);
-      picked.push(pool.splice(idx,1)[0]);
-    }
-    return picked;
+  function startCase(){
+    currentCard = drawCard();
+    currentPrediction = '';
+    quizResults = { know:false, inquiry:false };
+    const job = JOB_BY_ID[currentCard.jobId];
+    document.getElementById('caseImg').src = job.img;
+    document.getElementById('caseImg').alt = job.name;
+    document.getElementById('caseName').textContent = job.emoji + ' ' + job.name;
+    document.getElementById('situationText').textContent = currentCard.situation;
+    showScene('case');
   }
 
-  function startGuess(){
-    currentCard = drawCard();
-    document.getElementById('situationText').textContent = currentCard.situation;
-    const correctId = currentCard.jobId;
-    const distractors = pickDistractors(correctId, 3);
-    const options = [correctId, ...distractors];
+  function goPredict(){
+    document.getElementById('predictSituationText').textContent = currentCard.situation;
+    document.getElementById('predictInput').value = '';
+    showScene('predict');
+  }
+
+  function goQuiz(){
+    currentPrediction = document.getElementById('predictInput').value.trim();
+    renderQuiz('know');
+  }
+
+  function makeOptions(card, field){
+    const otherField = field === 'know' ? 'inquiry' : 'know';
+    const pool = FLAT_CARDS.filter(c => c !== card);
+    const picked = [];
+    while(picked.length < 2 && pool.length){
+      const idx = Math.floor(Math.random() * pool.length);
+      picked.push(pool.splice(idx, 1)[0]);
+    }
+    const options = [
+      { text: card[field], kind:'correct' },
+      { text: card[otherField], kind:'swap' },
+      { text: picked[0][field], kind:'other' },
+      { text: picked[1][field], kind:'other' },
+    ];
     for(let i = options.length - 1; i > 0; i--){
       const j = Math.floor(Math.random() * (i + 1));
       [options[i], options[j]] = [options[j], options[i]];
     }
+    return options;
+  }
+
+  function explainWrong(opt, field){
+    if(opt.kind === 'swap'){
+      return field === 'know'
+        ? '이건 "과학 지식"이 아니라 "과학적 탐구 과정"에 대한 설명이에요. 과학 지식은 알아야 하는 원리나 사실이고, 탐구 과정은 관찰·비교·분석으로 알아내는 방법이에요.'
+        : '이건 "과학적 탐구 과정"이 아니라 "과학 지식"에 대한 설명이에요. 탐구 과정은 관찰·비교·분석으로 알아내는 방법이고, 과학 지식은 알아야 하는 원리나 사실이에요.';
+    }
+    return '이 내용은 사실이지만, 이 상황과는 관련이 없어요. 다른 직업이나 다른 상황에 필요한 내용이에요.';
+  }
+
+  function renderQuiz(field){
+    const opts = makeOptions(currentCard, field);
+    document.getElementById('quizStep').textContent = field === 'know' ? '1 / 2' : '2 / 2';
+    document.getElementById('quizPrompt').textContent = field === 'know'
+      ? '🧪 이 상황을 해결하려면 어떤 과학 지식이 필요할까요?'
+      : '🔬 이 상황을 해결하려면 어떤 과학적 탐구 과정이 필요할까요?';
     const grid = document.getElementById('choiceGrid');
     grid.innerHTML = '';
-    options.forEach(id => {
-      const job = JOB_BY_ID[id];
+    document.getElementById('quizExplain').innerHTML = '';
+    document.getElementById('quizNextRow').style.display = 'none';
+
+    const btns = opts.map(opt => {
       const btn = document.createElement('button');
       btn.className = 'choice-opt';
-      btn.innerHTML = `<span class="em">${job.emoji}</span><span>${job.name}</span>`;
-      btn.addEventListener('click', () => chooseJob(id, correctId, btn));
+      btn.textContent = opt.text;
       grid.appendChild(btn);
+      return btn;
     });
-    showScene('guess');
+    btns.forEach((btn, idx) => {
+      btn.addEventListener('click', () => chooseQuizOption(opts, idx, btns, field));
+    });
+    showScene('quiz');
   }
 
-  function chooseJob(pickedId, correctId, btnEl){
-    const allBtns = document.querySelectorAll('.choice-opt');
-    allBtns.forEach(b => b.disabled = true);
-    const isCorrect = pickedId === correctId;
-    btnEl.classList.add(isCorrect ? 'correct' : 'wrong');
-    if(!isCorrect){
-      allBtns.forEach(b => {
-        if(b.textContent.includes(JOB_BY_ID[correctId].name)) b.classList.add('correct');
-      });
+  function chooseQuizOption(opts, idx, btns, field){
+    btns.forEach(b => b.disabled = true);
+    const picked = opts[idx];
+    const correctIdx = opts.findIndex(o => o.kind === 'correct');
+    btns[idx].classList.add(picked.kind === 'correct' ? 'correct' : 'wrong');
+    if(picked.kind !== 'correct') btns[correctIdx].classList.add('correct');
+
+    const explainEl = document.getElementById('quizExplain');
+    if(picked.kind === 'correct'){
+      quizResults[field] = true;
+      explainEl.innerHTML = `<div class="reveal-box"><div class="reveal-head inq">✅ 정답이에요!</div><div class="reveal-body"></div></div>`;
+      explainEl.querySelector('.reveal-body').textContent = opts[correctIdx].text;
+    } else {
+      explainEl.innerHTML = `
+        <div class="reveal-box"><div class="reveal-head wrong">❌ 다시 생각해 볼까요?</div><div class="reveal-body"></div></div>
+        <div class="reveal-box"><div class="reveal-head inq">✅ 정답</div><div class="reveal-body"></div></div>`;
+      const bodies = explainEl.querySelectorAll('.reveal-body');
+      bodies[0].textContent = explainWrong(picked, field);
+      bodies[1].textContent = opts[correctIdx].text;
     }
-    setTimeout(() => showReveal(isCorrect), 700);
+
+    const nextBtn = document.getElementById('quizNextBtn');
+    nextBtn.textContent = field === 'know' ? '다음: 탐구 과정 →' : '결과 확인하기 →';
+    nextBtn.onclick = () => { field === 'know' ? renderQuiz('inquiry') : showReveal(); };
+    document.getElementById('quizNextRow').style.display = 'flex';
   }
 
-  function showReveal(wasCorrect){
+  function showReveal(){
     const job = JOB_BY_ID[currentCard.jobId];
+    const isNew = !done.has(job.id);
     const banner = document.getElementById('resultBanner');
-    banner.textContent = wasCorrect ? `✅ 정답이에요! "${job.name}" 이야기였어요.` : `❌ 아쉬워요! 정답은 "${job.name}"였어요.`;
-    banner.className = 'result-banner ' + (wasCorrect ? 'correct' : 'wrong');
+    const scoreCount = (quizResults.know ? 1 : 0) + (quizResults.inquiry ? 1 : 0);
+    const scoreText = `지식 ${quizResults.know ? '✅' : '❌'} · 탐구 과정 ${quizResults.inquiry ? '✅' : '❌'}`;
+    banner.textContent = (isNew ? `🆕 "${job.name}" 도감 등록! ` : `📎 "${job.name}" 다시 만났어요! `) + scoreText;
+    banner.className = 'result-banner ' + (scoreCount === 2 ? 'correct' : 'wrong');
 
     document.getElementById('revealImg').src = job.img;
     document.getElementById('revealImg').alt = job.name;
@@ -652,7 +771,14 @@
     document.getElementById('revealKnow').textContent = currentCard.know;
     document.getElementById('revealInquiry').textContent = currentCard.inquiry;
 
-    const isNew = !done.has(job.id);
+    const predictBox = document.getElementById('predictRecapBox');
+    if(currentPrediction){
+      predictBox.style.display = 'block';
+      document.getElementById('predictRecap').textContent = currentPrediction;
+    } else {
+      predictBox.style.display = 'none';
+    }
+
     document.getElementById('newBadge').style.display = isNew ? 'inline-block' : 'none';
     if(isNew){
       done.add(job.id);
@@ -675,8 +801,10 @@
     renderDogam();
     showScene('dogam');
   });
-  document.getElementById('btnDraw').addEventListener('click', startGuess);
-  document.getElementById('btnDrawAgain').addEventListener('click', startGuess);
+  document.getElementById('btnDraw').addEventListener('click', startCase);
+  document.getElementById('btnDrawAgain').addEventListener('click', startCase);
+  document.getElementById('btnCaseNext').addEventListener('click', goPredict);
+  document.getElementById('btnPredictNext').addEventListener('click', goQuiz);
   document.getElementById('btnRevealBackDogam').addEventListener('click', () => { renderDogam(); showScene('dogam'); });
   document.getElementById('btnSummaryBack').addEventListener('click', () => { renderDogam(); showScene('dogam'); });
 
