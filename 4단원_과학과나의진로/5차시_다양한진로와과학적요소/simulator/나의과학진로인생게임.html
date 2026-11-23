@@ -92,7 +92,11 @@
   .job-head h2{ margin:0; font-size:1.2rem; }
   .job-head .sub{ font-size:.82rem; color:var(--ink-soft); margin-top:2px; }
 
-  .case-badge{ text-align:center; font-size:3rem; margin-bottom:6px; }
+  .case-hero{ border-radius:16px; overflow:hidden; border:1px solid var(--panel-line); margin-bottom:16px; }
+  .case-hero img{ width:100%; aspect-ratio:4/3; object-fit:cover; display:block; }
+  .case-hero .cap{ padding:10px 16px; background:var(--panel); display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .case-hero .cap h2{ margin:0; font-size:1.15rem; }
+  .case-hero .cap .sub{ font-size:.78rem; font-weight:800; color:var(--accent-sun); flex-shrink:0; }
   .task-card{ background:var(--paper); border:1px solid var(--panel-line); border-radius:16px; padding:22px 18px; text-align:center; }
   .task-card .lab{ font-size:.78rem; font-weight:800; color:var(--accent-sun); margin-bottom:8px; }
   .task-card p{ font-size:1.02rem; font-weight:700; line-height:1.55; margin:0; }
@@ -198,11 +202,10 @@
 
     <!-- 장면 2: 사건 카드 (직업 공개) -->
     <div class="scene" id="sceneCase">
-      <div class="case-badge">📋</div>
-      <div class="job-head" id="caseJobHead">
+      <div class="case-hero">
         <img id="caseImg" src="" alt="">
-        <div>
-          <h2 id="caseName" style="font-size:1.05rem;"></h2>
+        <div class="cap">
+          <h2 id="caseName"></h2>
           <div class="sub">사건 발생!</div>
         </div>
       </div>
